@@ -1,0 +1,11 @@
+STEPS -
+Make sure u downalod PostgreSQL and create default username as postgres and password as POSTGRE
+Make sure you download the LTS Node.js
+Make sure u have the python installed
+And everything should be added to system environment varaiables
+1) Delete the current venv folder and create new using python -m venv venv
+2) To grant acces to activate venv every time run  Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+3) Then to activate venv run venv\Scripts\activate
+4) Then to install all necessary packages run pip install -r requirements.txt
+5) Then inside venv run only once python auto_setup.py
+6) To run the proj, inside venv run python start_project.py
