@@ -25,7 +25,7 @@ def _extract_embedding(image_file):
 
         representations = DeepFace.represent(
             img_path=tmp_path,
-            model_name="ArcFace",
+            model_name="VGG-Face",
             detector_backend="opencv",
             enforce_detection=False,
         )
@@ -223,7 +223,7 @@ def reencode_all_faces(request):
                 try:
                     representations = DeepFace.represent(
                         img_path=tmp_path,
-                        model_name="ArcFace",
+                        model_name="VGG-Face",
                         detector_backend="opencv",
                         enforce_detection=False,
                     )
