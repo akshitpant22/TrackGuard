@@ -1,6 +1,8 @@
 import math
 import os
 import tempfile
+import gc
+import tensorflow as tf
 
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -242,6 +244,10 @@ def reencode_all_faces(request):
 
             except Exception as e:
                 failed.append({"id": criminal.criminal_id, "error": str(e)})
+            
+            # FORCE MEMORY CLEAR AFTER EVERY IMAGE
+            tf.keras.backend.clear_session()
+            gc.collect()
 
         return JsonResponse({
             "success": True,
