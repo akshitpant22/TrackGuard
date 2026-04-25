@@ -1,16 +1,6 @@
 import math
 import os
 import tempfile
-import gc
-
-# EXTREME MEMORY OPTIMIZATION FOR RENDER (512MB)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
-os.environ['TF_NUM_INTEROP_THREADS'] = '1'
-os.environ['TF_ENABLE_XLA'] = '0'
-
-import tensorflow as tf
 
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -22,6 +12,15 @@ from .supabase_storage import upload_criminal_image
 
 
 def _extract_embedding(image_file):
+    import gc
+    # EXTREME MEMORY OPTIMIZATION
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
+    os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+    os.environ['TF_ENABLE_XLA'] = '0'
+    
+    import tensorflow as tf
     from deepface import DeepFace
     suffix = os.path.splitext(image_file.name)[1] or ".jpg"
     tmp_path = None
@@ -50,6 +49,14 @@ def _extract_embedding(image_file):
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
+        # FORCE CLEANUP
+        try:
+            import tensorflow as tf
+            import gc
+            tf.keras.backend.clear_session()
+            gc.collect()
+        except:
+            pass
 
 
 def _cosine_distance(vec1, vec2):
@@ -207,8 +214,18 @@ def search_by_face(request):
 @api_view(["GET", "POST"])
 @permission_classes([AllowAny])
 def reencode_all_faces(request):
+    import gc
+    import os
+    # EXTREME MEMORY OPTIMIZATION
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
+    os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+    os.environ['TF_ENABLE_XLA'] = '0'
+    
     try:
         import requests as req
+        import tensorflow as tf
         from deepface import DeepFace
 
         criminals = Criminal.objects.exclude(image_url__isnull=True).exclude(image_url='')
