@@ -2,6 +2,14 @@ import math
 import os
 import tempfile
 import gc
+
+# EXTREME MEMORY OPTIMIZATION FOR RENDER (512MB)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
+os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+os.environ['TF_ENABLE_XLA'] = '0'
+
 import tensorflow as tf
 
 from rest_framework.decorators import api_view, parser_classes, permission_classes
