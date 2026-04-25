@@ -8,6 +8,8 @@ class Criminal(models.Model):
     gender = models.CharField(max_length=20)
     address = models.TextField(blank=True, null=True)
     aadhaar_number = models.CharField(max_length=20)
+    image_url = models.TextField(blank=True, null=True)
+    face_encoding = models.JSONField(blank=True, null=True)
 
     class Meta:
         managed = False

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import caseRecordService from '../../services/caseRecordService';
 import CourtCaseRecordForm from './CourtCaseRecordForm';
 import { toast } from 'react-toastify';
+import { getStyles } from '../../styles/darkTheme';
+const ds = getStyles('court');
 
 const CourtCaseRecordList = () => {
   const [caseRecords, setCaseRecords] = useState([]);
@@ -12,392 +14,40 @@ const CourtCaseRecordList = () => {
   const [searchMode, setSearchMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
   const PAGE_SIZE = 20;
 
-  useEffect(() => {
-    loadPaginatedCaseRecords(currentPage);
-  }, [currentPage]);
-
-  // ✅ Paginated load
-  const loadPaginatedCaseRecords = async (page = 1) => {
-    try {
-      setLoading(true);
-      const data = await caseRecordService.getPaginated(page);
-
-      if (data?.results) {
-        const sorted = data.results.sort((a, b) => a.case_id - b.case_id);
-        setCaseRecords(sorted);
-        setTotalPages(Math.ceil(data.count / PAGE_SIZE));
-        setCurrentPage(page);
-      } else {
-        setCaseRecords([]);
-        setTotalPages(1);
-      }
-    } catch (err) {
-      console.error('Error loading case records:', err);
-      toast.error('Failed to load case records.');
-      setCaseRecords([]);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => { loadPage(currentPage); }, [currentPage]);
+  const loadPage = async (page=1) => {
+    try{setLoading(true);const d=await caseRecordService.getPaginated(page);if(d?.results){setCaseRecords(d.results.sort((a,b)=>a.case_id-b.case_id));setTotalPages(Math.ceil(d.count/PAGE_SIZE));setCurrentPage(page);}else{setCaseRecords([]);setTotalPages(1);}}
+    catch(e){toast.error('Failed');setCaseRecords([]);}finally{setLoading(false);}
   };
-
-  // ✅ Search by case ID (API)
-  const executeSearch = async () => {
-    const value = searchId.trim();
-
-    if (!value) {
-      setSearchMode(false);
-      await loadPaginatedCaseRecords(currentPage);
-      return;
-    }
-
-    if (!/^\d+$/.test(value)) {
-      toast.warning('Search accepts only numeric Case IDs');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setSearchMode(true);
-      const response = await caseRecordService.getCaseRecord(value);
-      setCaseRecords([response]);
-      setTotalPages(1);
-    } catch (err) {
-      console.warn('Case not found:', err);
-      setCaseRecords([]);
-      toast.info('No case record found with that ID.');
-    } finally {
-      setLoading(false);
-    }
+  const doSearch = async () => {
+    const v=searchId.trim();if(!v){setSearchMode(false);await loadPage(currentPage);return;}if(!/^\d+$/.test(v)){toast.warning('Numeric IDs only');return;}
+    try{setLoading(true);setSearchMode(true);const r=await caseRecordService.getCaseRecord(v);setCaseRecords([r]);setTotalPages(1);}catch(e){setCaseRecords([]);toast.info('Not found');}finally{setLoading(false);}
   };
-
-  const handleClearSearch = async () => {
-    setSearchId('');
-    setSearchMode(false);
-    await loadPaginatedCaseRecords(currentPage);
-  };
-
-  // ✅ Delete case
   const handleDelete = async (id) => {
-    if (!window.confirm(`Are you sure you want to delete Case ${id}?`)) return;
-
-    try {
-      const success = await caseRecordService.deleteCaseRecord(id);
-      if (success) {
-        toast.success('Case record deleted successfully');
-        window.dispatchEvent(new Event('refreshStats'));
-        await loadPaginatedCaseRecords(currentPage);
-      } else {
-        toast.error('Failed to delete case record.');
-      }
-    } catch (err) {
-      console.error('Delete error:', err);
-      toast.error('❌ Failed to delete case record. Please try again.');
-    }
+    if(!window.confirm(`Delete Case ${id}?`))return;
+    try{const ok=await caseRecordService.deleteCaseRecord(id);if(ok){toast.success('Deleted');window.dispatchEvent(new Event('refreshStats'));await loadPage(currentPage);}else toast.error('Failed');}catch(e){toast.error('Failed');}
   };
-
-  const handleCaseRecordAdded = async () => {
-    setShowForm(false);
-    toast.success('Case record added successfully!');
-    await loadPaginatedCaseRecords(currentPage);
-    window.dispatchEvent(new Event('refreshStats'));
+  const onAdded = async () => {setShowForm(false);toast.success('Case added!');await loadPage(currentPage);window.dispatchEvent(new Event('refreshStats'));};
+  const onUpdated = async () => {setShowForm(false);setEditingCase(null);toast.success('Updated!');await loadPage(currentPage);window.dispatchEvent(new Event('refreshStats'));};
+  const renderPag = () => {
+    if(searchMode)return null;const mx=5;let s=Math.max(1,currentPage-2);let e=Math.min(totalPages,s+mx-1);if(e-s<mx-1)s=Math.max(1,e-mx+1);
+    const ps=[];for(let i=s;i<=e;i++)ps.push(<button key={i} style={i===currentPage?ds.activePage:ds.pageButton} onClick={()=>loadPage(i)}>{i}</button>);
+    return <div style={ds.paginationContainer}><button style={ds.pageNavButton} onClick={()=>loadPage(1)} disabled={currentPage===1}>{'<<'}</button><button style={ds.pageNavButton} onClick={()=>loadPage(Math.max(1,currentPage-1))} disabled={currentPage===1}>{'<'}</button>{ps}<button style={ds.pageNavButton} onClick={()=>loadPage(Math.min(totalPages,currentPage+1))} disabled={currentPage===totalPages}>{'>'}</button><button style={ds.pageNavButton} onClick={()=>loadPage(totalPages)} disabled={currentPage===totalPages}>{'>>'}</button></div>;
   };
-
-  const handleCaseRecordUpdated = async () => {
-    setShowForm(false);
-    setEditingCase(null);
-    toast.success('Case record updated successfully!');
-    await loadPaginatedCaseRecords(currentPage);
-    window.dispatchEvent(new Event('refreshStats'));
-  };
-
-  const handleEditClick = (caseRecord) => {
-    setEditingCase(caseRecord);
-    setShowForm(true);
-  };
-
-  // ✅ Pagination
-  const renderPagination = () => {
-    if (searchMode) return null;
-
-    const maxPagesToShow = 5;
-    let start = Math.max(1, currentPage - 2);
-    let end = Math.min(totalPages, start + maxPagesToShow - 1);
-    if (end - start < maxPagesToShow - 1) start = Math.max(1, end - maxPagesToShow + 1);
-
-    const pages = [];
-    for (let i = start; i <= end; i++) {
-      pages.push(
-        <button
-          key={i}
-          style={i === currentPage ? styles.activePage : styles.pageButton}
-          onClick={() => loadPaginatedCaseRecords(i)}
-        >
-          {i}
-        </button>
-      );
-    }
-
-    return (
-      <div style={styles.paginationContainer}>
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedCaseRecords(1)}
-          disabled={currentPage === 1}
-        >
-          {'<<'}
-        </button>
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedCaseRecords(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
-        >
-          {'<'}
-        </button>
-        {pages}
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedCaseRecords(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage === totalPages}
-        >
-          {'>'}
-        </button>
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedCaseRecords(totalPages)}
-          disabled={currentPage === totalPages}
-        >
-          {'>>'}
-        </button>
-      </div>
-    );
-  };
-
-  if (loading) return <div style={styles.loading}>Loading case records...</div>;
-
+  if(loading)return <div style={ds.loading}>Loading case records...</div>;
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h2>Case Record Management</h2>
-        <button
-          style={styles.addButton}
-          onClick={() => {
-            setEditingCase(null);
-            setShowForm(!showForm);
-          }}
-        >
-          {showForm ? '← Back to List' : '+ Add New Case Record'}
-        </button>
-      </div>
-
-      {showForm ? (
-        <CourtCaseRecordForm
-          onCaseRecordAdded={handleCaseRecordAdded}
-          onCaseRecordUpdated={handleCaseRecordUpdated}
-          onCancel={() => setShowForm(false)}
-          editCaseRecord={editingCase}
-        />
-      ) : (
-        <>
-          <div style={styles.tableHeader}>
-            <div style={styles.headerLeft}>
-              <input
-                type="text"
-                placeholder="Enter Case ID..."
-                value={searchId}
-                onChange={(e) => setSearchId(e.target.value)}
-                style={styles.searchInput}
-              />
-              <button style={styles.searchButton} onClick={executeSearch}>
-                Search
-              </button>
-              {searchId && (
-                <button style={styles.clearButton} onClick={handleClearSearch}>
-                  ✕
-                </button>
-              )}
-            </div>
-            {!searchMode && (
-              <span style={styles.resultCount}>
-                Page {currentPage} of {totalPages}
-              </span>
-            )}
-          </div>
-
-          <div style={styles.tableContainer}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.tableTh}>CASE ID</th>
-                  <th style={styles.tableTh}>FIR ID</th>
-                  <th style={styles.tableTh}>COURT ID</th>
-                  <th style={styles.tableTh}>START DATE</th>
-                  <th style={styles.tableTh}>STATUS</th>
-                  <th style={styles.tableTh}>VERDICT</th>
-                  <th style={styles.tableTh}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {caseRecords.length > 0 ? (
-                  caseRecords.map((caseRecord) => (
-                    <tr key={caseRecord.case_id}>
-                      <td style={styles.tableTd}>{caseRecord.case_id}</td>
-                      <td style={styles.tableTd}>{caseRecord.fir || caseRecord.fir_id || 'N/A'}</td>
-                      <td style={styles.tableTd}>{caseRecord.court || caseRecord.court_id || 'N/A'}</td>
-                      <td style={styles.tableTd}>
-                        {caseRecord.start_date ? new Date(caseRecord.start_date).toLocaleDateString() : 'N/A'}
-                      </td>
-                      <td style={styles.tableTd}>{caseRecord.status || 'Unknown'}</td>
-                      <td style={styles.tableTd}>
-                        {caseRecord.verdict
-                          ? caseRecord.verdict.length > 50
-                            ? caseRecord.verdict.substring(0, 50) + '...'
-                            : caseRecord.verdict
-                          : 'No verdict'}
-                      </td>
-                      <td style={styles.tableTd}>
-                        <button style={styles.editButton} onClick={() => handleEditClick(caseRecord)}>
-                          Edit
-                        </button>
-                        <button
-                          style={styles.deleteButton}
-                          onClick={() => handleDelete(caseRecord.case_id)}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="7" style={styles.noData}>
-                      {searchMode ? 'No case record found with that ID' : 'No case records found'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {renderPagination()}
-        </>
-      )}
+    <div style={ds.listContainer}>
+      <div style={ds.listHeader}><h2 style={ds.listTitle}>Case Record Management</h2><button style={ds.addButton} onClick={()=>{setEditingCase(null);setShowForm(!showForm);}}>{showForm?'← Back':'+ Add New Case Record'}</button></div>
+      {showForm?<CourtCaseRecordForm onCaseRecordAdded={onAdded} onCaseRecordUpdated={onUpdated} onCancel={()=>setShowForm(false)} editCaseRecord={editingCase}/>:(<>
+        <div style={ds.tableHeader}><div style={ds.headerLeftRow}><input type="text" placeholder="Enter Case ID..." value={searchId} onChange={e=>setSearchId(e.target.value)} style={ds.searchInput}/><button style={ds.searchButton} onClick={doSearch}>Search</button>{searchId&&<button style={ds.clearButton} onClick={()=>{setSearchId('');setSearchMode(false);loadPage(currentPage);}}>✕</button>}</div>{!searchMode&&<span style={ds.resultCount}>Page {currentPage} of {totalPages}</span>}</div>
+        <div style={ds.tableContainer}><table style={ds.table}><thead><tr>{['CASE ID','FIR ID','COURT ID','START DATE','STATUS','VERDICT','ACTIONS'].map(h=><th key={h} style={ds.tableTh}>{h}</th>)}</tr></thead><tbody>
+          {caseRecords.length>0?caseRecords.map(c=>(<tr key={c.case_id}><td style={ds.tableTd}>{c.case_id}</td><td style={ds.tableTd}>{c.fir||c.fir_id||'N/A'}</td><td style={ds.tableTd}>{c.court||c.court_id||'N/A'}</td><td style={ds.tableTd}>{c.start_date?new Date(c.start_date).toLocaleDateString():'N/A'}</td><td style={ds.tableTd}>{c.status||'Unknown'}</td><td style={ds.tableTd}>{c.verdict?(c.verdict.length>50?c.verdict.substring(0,50)+'...':c.verdict):'No verdict'}</td><td style={ds.tableTd}><div style={ds.actionButtons}><button style={ds.editButton} onClick={()=>{setEditingCase(c);setShowForm(true);}}>Edit</button><button style={ds.deleteButton} onClick={()=>handleDelete(c.case_id)}>Delete</button></div></td></tr>))
+          :<tr><td colSpan="7" style={ds.noData}>{searchMode?'Not found':'No case records'}</td></tr>}
+        </tbody></table></div>{renderPag()}
+      </>)}
     </div>
   );
 };
-
-const styles = {
-  container: {
-    padding: '20px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-    margin: '20px',
-  },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  addButton: {
-    padding: '10px 20px',
-    backgroundColor: '#722f37',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-  },
-  tableHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '10px',
-    flexWrap: 'wrap',
-  },
-  headerLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
-  searchInput: {
-    padding: '10px 15px',
-    width: '250px',
-    borderRadius: '6px',
-    border: '1px solid #ccc',
-  },
-  searchButton: {
-    padding: '10px 15px',
-    backgroundColor: '#1e40af',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  clearButton: {
-    padding: '10px 12px',
-    backgroundColor: '#6c757d',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  tableContainer: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  tableTh: {
-    backgroundColor: '#f8f9fa',
-    padding: '10px',
-    textAlign: 'left',
-    borderBottom: '1px solid #dee2e6',
-  },
-  tableTd: {
-    padding: '10px',
-    borderBottom: '1px solid #dee2e6',
-  },
-  editButton: {
-    padding: '6px 10px',
-    backgroundColor: '#ffc107',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    marginRight: '5px',
-  },
-  deleteButton: {
-    padding: '6px 10px',
-    backgroundColor: '#dc3545',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    color: 'white',
-  },
-  paginationContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '20px',
-    gap: '5px',
-  },
-  pageButton: {
-    padding: '6px 10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  activePage: {
-    padding: '6px 10px',
-    border: '1px solid #722f37',
-    backgroundColor: '#722f37',
-    color: 'white',
-    borderRadius: '4px',
-  },
-  pageNavButton: {
-    padding: '6px 10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  noData: { textAlign: 'center', padding: '20px', color: '#6c757d' },
-  loading: { textAlign: 'center', padding: '40px', fontSize: '18px' },
-  resultCount: {
-    color: '#6c757d',
-    fontSize: '14px',
-    fontWeight: '500',
-  },
-};
-
 export default CourtCaseRecordList;

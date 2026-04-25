@@ -1,216 +1,120 @@
-<!-- HEADER -->
+# TrackGuard - Crime Records & Criminal Tracking System
 
-<h1 align="center">⚖️ Crime Record & Criminal Tracking System (CRCTS)</h1>
+A full-stack web application for managing crime records, FIRs, court cases, and criminal identification using facial recognition.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/CRIME%20RECORD%20TRACKING%20SYSTEM-DJANGO%20%7C%20REACT-blueviolet?style=for-the-badge&logo=django" />
-</p>
+## Tech Stack
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" />
-  <img src="https://img.shields.io/badge/Django-5.0%2B-44B78B?style=for-the-badge&logo=django" />
-  <img src="https://img.shields.io/badge/React-18%2B-61DAFB?style=for-the-badge&logo=react" />
-  <img src="https://img.shields.io/badge/PostgreSQL-15%2B-336791?style=for-the-badge&logo=postgresql" />
-</p>
+- **Frontend**: React 18 with custom dark theme
+- **Backend**: Django 5 + Django REST Framework
+- **Database**: PostgreSQL (Supabase hosted)
+- **Storage**: Supabase Storage (criminal face images)
+- **Face Recognition**: DeepFace with ArcFace model
+- **Auth**: JWT (SimpleJWT)
 
-> 🕵️‍♀️ **A robust, scalable, and secure full-stack system for managing criminal records — integrating Police, Court, and Admin roles seamlessly.**
+## Quick Start
 
----
+### Prerequisites
 
-## 🌟 Overview
+- Python 3.9+
+- Node.js 16+
+- Git
 
-The **Crime Record & Criminal Tracking System (CRCTS)** is a centralized digital crime management platform designed to:
-
-* Digitize and centralize **criminal data**
-* Streamline collaboration between **Police, Courts, and Administrators**
-* Enhance accountability, traceability, and security through role-based access
-
----
-
-## 🧩 Tech Stack
-
-| Layer                 | Technology                          |
-| :-------------------- | :---------------------------------- |
-| 💻 **Frontend**       | React.js + Tailwind CSS             |
-| ⚙️ **Backend**        | Django + Django REST Framework      |
-| 🗄️ **Database**      | PostgreSQL                          |
-| 🔐 **Authentication** | JSON Web Tokens (JWT via SimpleJWT) |
-| 🤖 **Automation**     | `auto_setup.py`, `start_project.py` |
-
----
-
-## 🧠 Core Features
-
-### 👮 Police Module
-
-* Manage **FIRs**, **criminal records**, and **case entries**
-* Read-only access to courts and other stations
-* Full CRUD on their jurisdiction’s data
-
-### ⚖️ Court Module
-
-* Manage **case hearings, outcomes, and judgments**
-* Read-only access to linked FIR and criminal data
-* Restricted modification rights based on assignment
-
-### 👑 Admin Module
-
-* Manage all user roles and access levels
-* Full CRUD rights across all entities
-* System-wide statistics dashboard with live updates
-
-### 📊 Analytics Dashboard
-
-* Real-time overview of:
-
-  * 👤 Total Criminals
-  * 📜 Total FIRs
-  * ⚖️ Total Cases
-  * 🏢 Police Stations
-  * 🏛️ Courts
-* Auto-fetched from backend via REST APIs
-
-### 🔒 Role-Based Authentication
-
-* JWT-based authentication with dynamic redirect:
-
-  * 👑 **Admin** → `/admin`
-  * 👮 **Police** → `/police`
-  * ⚖️ **Court** → `/court`
-
----
-
-## 🏗️ Project Structure
+### Setup
 
 ```bash
-CRCTS/
-│
-├── crcts-frontend/        # React Frontend
-│   ├── src/
-│   └── package.json
-│
-├── crimeapp/              # Django App (Backend)
-│   ├── models.py
-│   ├── views.py
-│   ├── serializers.py
-│   └── urls.py
-│
-├── data/                  # CSV Files for Initial Data
-│   ├── criminals.csv
-│   ├── firs.csv
-│   ├── case_records.csv
-│   └── ...
-│
-├── create_tables.sql      # SQL schema for unmanaged models
-├── auto_setup.py          # Automates full DB + Data setup
-├── start_project.py       # Universal launcher (Win/macOS/Linux)
-├── manage.py
-└── requirements.txt
-```
-
----
-
-## ⚙️ Installation Guide
-
-### 🧩 Prerequisites
-
-Make sure you have:
-
-* 🐍 Python ≥ 3.10
-* 🐘 PostgreSQL ≥ 15
-* 🟩 Node.js (LTS recommended)
-* 🧰 Git
-
----
-
-### 🪶 Step 1 — Clone Repository
-
-```bash
-git clone https://github.com/yourusername/CRCTS.git
-cd CRCTS
-```
-
-### 🪶 Step 2 — Create & Activate Virtual Environment
-
-```bash
-python -m venv venv
-```
-
-> 💡 **If activation fails (Windows PowerShell)**:
->
-> ```bash
-> Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-> ```
-
-Then:
-
-```bash
-# Windows
-venv\Scripts\activate
-
-# macOS / Linux
-source venv/bin/activate
-```
-
----
-
-### 🪶 Step 3 — Install Python Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-### 🪶 Step 4 — Auto Setup the Project
-
-```bash
+git clone <repo-url>
+cd crcts
 python auto_setup.py
 ```
 
-✅ Creates PostgreSQL database `crime_db`
-✅ Runs all migrations
-✅ Executes SQL schema
-✅ Imports CSVs automatically
-✅ Creates users for all roles
+This will:
+1. Check Python and Node.js versions
+2. Create a Python virtual environment
+3. Install all backend dependencies (Django, DRF, DeepFace, Supabase, etc.)
+4. Install all frontend dependencies (React, Axios, etc.)
+5. Run Django migrations
+6. Create template .env files if missing
 
----
+### Environment Variables
 
-### 🪶 Step 5 — Start the Full Application
+**Backend** (`crcts/.env`):
+```
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_BUCKET=criminal-faces
+```
+
+**Frontend** (`crcts-frontend/.env`):
+```
+REACT_APP_API_BASE_URL=http://127.0.0.1:8000/api
+REACT_APP_BACKEND_URL=http://127.0.0.1:8000
+```
+
+### Running
 
 ```bash
 python start_project.py
 ```
 
-✅ **Backend:** [http://127.0.0.1:8000](http://127.0.0.1:8000)
-✅ **Frontend:** [http://localhost:3000](http://localhost:3000)
+This launches both backend (port 8000) and frontend (port 3000) in separate terminals.
 
-Two terminals will open automatically — one for Django and one for React.
+### Default Login
 
----
+| Role    | Username | Password   |
+|---------|----------|------------|
+| Admin   | admin    | admin123   |
+| Police  | police1  | police123  |
+| Court   | court1   | court123   |
 
+## Project Structure
 
-## 🧭 Usage
+```
+crcts/
+├── crimeapp/             # Django app (models, views, serializers)
+│   ├── models.py         # Criminal, FIR, Court, CaseRecord, etc.
+│   ├── views.py          # REST API viewsets + role permissions
+│   ├── face_views.py     # Face recognition endpoints
+│   ├── serializers.py    # DRF serializers
+│   └── supabase_storage.py
+├── crcts_proj/           # Django project settings
+├── crcts-frontend/       # React frontend
+│   └── src/
+│       ├── pages/        # Login, Dashboard, Criminal, FIR, etc.
+│       ├── services/     # API service layer
+│       ├── context/      # Auth context
+│       ├── components/   # Layout, ProtectedRoute
+│       └── styles/       # Dark theme, global CSS
+├── auto_setup.py         # One-command project setup
+├── start_project.py      # Launch both servers
+└── requirements.txt      # Python dependencies
+```
 
-1. Navigate to **[http://localhost:3000](http://localhost:3000)**
-2. Login using role credentials
-3. Explore the interactive dashboards
-4. Perform CRUD operations as per role permissions
-5. Logout securely once done
+## Role-Based Access
 
----
+| Feature          | Admin | Police | Court |
+|-----------------|-------|--------|-------|
+| Manage Criminals | Full  | Full   | View  |
+| Manage FIRs      | Full  | Full   | View  |
+| Manage Cases     | Full  | View   | Full  |
+| Manage Courts    | Full  | View   | View  |
+| Face Search      | Yes   | Yes    | No    |
+| Police Stations  | Full  | View   | No    |
 
-## ⚒️ Common Commands
+## Deployment
 
-| Task                  | Command                                |
-| :-------------------- | :------------------------------------- |
-| Run Backend only      | `python manage.py runserver`           |
-| Run Frontend only     | `npm start` (inside `crcts-frontend/`) |
-| Reset Database        | `python auto_setup.py`                 |
-| Create Admin Manually | `python manage.py createsuperuser`     |
+### Backend (Render / Railway)
 
----
+1. Push code to GitHub
+2. Connect repo to Render or Railway
+3. Set build command: `pip install -r requirements.txt`
+4. Set start command: `gunicorn crcts_proj.wsgi:application`
+5. Add environment variables (DATABASE_URL, SUPABASE keys)
+6. Add `gunicorn` to requirements.txt for production
 
+### Frontend (Vercel / Netlify)
 
-
-
+1. Connect `crcts-frontend` folder to Vercel/Netlify
+2. Set build command: `npm run build`
+3. Set output directory: `build`
+4. Set env variable: `REACT_APP_API_BASE_URL=https://your-backend-url.com/api`

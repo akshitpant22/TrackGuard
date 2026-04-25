@@ -14,18 +14,15 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     );
   }
 
-  // If no user is logged in, redirect to login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Check if user has required role
   const userGroups = user.groups || [];
   const hasPermission = allowedRoles.some(role => 
     userGroups.includes(role) || user.is_superuser
   );
 
-  // If user doesn't have permission, show access denied
   if (!hasPermission) {
     return (
       <div style={styles.accessDenied}>
@@ -43,11 +40,9 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     );
   }
 
-  // User has permission, show the protected content
   return children;
 };
 
-// Styles for the component
 const styles = {
   loading: {
     display: 'flex',
@@ -91,7 +86,6 @@ const styles = {
   }
 };
 
-// Add CSS for spinner animation
 if (typeof document !== 'undefined') {
   const style = document.createElement('style');
   style.textContent = `

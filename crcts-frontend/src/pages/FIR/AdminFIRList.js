@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import firService from '../../services/firService';
 import FIRForm from './FIRForm';
 import { toast } from 'react-toastify';
+import { getStyles } from '../../styles/darkTheme';
+const ds = getStyles('admin');
 
 const AdminFIRList = () => {
   const [firs, setFirs] = useState([]);
@@ -12,392 +14,48 @@ const AdminFIRList = () => {
   const [searchMode, setSearchMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
   const PAGE_SIZE = 20;
 
-  useEffect(() => {
-    loadPaginatedFirs(currentPage);
-  }, [currentPage]);
-
-  const loadPaginatedFirs = async (page = 1) => {
-    try {
-      setLoading(true);
-      const data = await firService.getPaginated(page);
-
-      if (data?.results) {
-        const sorted = data.results.sort((a, b) => a.fir_id - b.fir_id);
-        setFirs(sorted);
-        setTotalPages(Math.ceil(data.count / PAGE_SIZE));
-        setCurrentPage(page);
-      } else {
-        setFirs([]);
-        setTotalPages(1);
-      }
-    } catch (err) {
-      console.error('Error loading FIRs:', err);
-      toast.error('Failed to load FIRs.');
-      setFirs([]);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => { loadPage(currentPage); }, [currentPage]);
+  const loadPage = async (page=1) => {
+    try{setLoading(true);const d=await firService.getPaginated(page);if(d?.results){setFirs(d.results.sort((a,b)=>a.fir_id-b.fir_id));setTotalPages(Math.ceil(d.count/PAGE_SIZE));setCurrentPage(page);}else{setFirs([]);setTotalPages(1);}}
+    catch(e){toast.error('Failed to load FIRs.');setFirs([]);}finally{setLoading(false);}
   };
-
-  const executeSearch = async () => {
-    const value = searchId.trim();
-
-    if (!value) {
-      setSearchMode(false);
-      await loadPaginatedFirs(currentPage);
-      return;
-    }
-
-    if (!/^\d+$/.test(value)) {
-      toast.warning('Search accepts only numeric IDs');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setSearchMode(true);
-      const response = await firService.getFir(value);
-      setFirs([response]);
-      setTotalPages(1);
-    } catch (err) {
-      console.warn('FIR not found:', err);
-      setFirs([]);
-      toast.info('No FIR found with that ID.');
-    } finally {
-      setLoading(false);
-    }
+  const doSearch = async () => {
+    const v=searchId.trim();if(!v){setSearchMode(false);await loadPage(currentPage);return;}if(!/^\d+$/.test(v)){toast.warning('Numeric IDs only');return;}
+    try{setLoading(true);setSearchMode(true);const r=await firService.getFir(v);setFirs([r]);setTotalPages(1);}catch(e){setFirs([]);toast.info('Not found');}finally{setLoading(false);}
   };
-
-  const handleClearSearch = async () => {
-    setSearchId('');
-    setSearchMode(false);
-    await loadPaginatedFirs(currentPage);
+  const handleDelete = async (id,ct) => {
+    if(!window.confirm(`Delete FIR for "${ct}"?`))return;
+    try{const ok=await firService.deleteFir(id);if(ok){toast.success('Deleted');window.dispatchEvent(new Event('refreshStats'));await loadPage(currentPage);}else toast.error('Failed');}catch(e){toast.error('Failed');}
   };
-
-  const handleDelete = async (id, crimeType) => {
-    if (!window.confirm(`Are you sure you want to delete FIR for "${crimeType}"?`)) return;
-
-    try {
-      const success = await firService.deleteFir(id);
-      
-      if (success) {
-        toast.success('FIR deleted successfully');
-        
-        // Refresh dashboard stats
-        window.dispatchEvent(new Event('refreshStats'));
-        
-        // Simple reload - let useEffect handle the page logic
-        await loadPaginatedFirs(currentPage);
-      } else {
-        toast.error('Failed to delete FIR.');
-      }
-    } catch (err) {
-      console.error('Delete error:', err);
-      toast.error('❌ Failed to delete FIR. Please try again.');
-    }
+  const onAdded = async () => {setShowForm(false);toast.success('FIR added!');await loadPage(currentPage);window.dispatchEvent(new Event('refreshStats'));};
+  const onUpdated = async () => {setShowForm(false);setEditingFIR(null);toast.success('FIR updated!');await loadPage(currentPage);};
+  const getStatusBadge = (status) => {
+    if(!status) return ds.unknownBadge;
+    const s = status.toLowerCase();
+    if(s.includes('open')||s.includes('registered')) return ds.openBadge;
+    if(s.includes('closed')) return ds.closedBadge;
+    if(s.includes('investigation')||s.includes('pending')||s.includes('charge')) return ds.investigationBadge;
+    return ds.unknownBadge;
   };
-
-  const handleFIRAdded = async () => {
-    setShowForm(false);
-    toast.success('FIR added successfully!');
-    await loadPaginatedFirs(currentPage);
-    window.dispatchEvent(new Event('refreshStats'));
+  const renderPag = () => {
+    if(searchMode)return null;const mx=5;let s=Math.max(1,currentPage-2);let e=Math.min(totalPages,s+mx-1);if(e-s<mx-1)s=Math.max(1,e-mx+1);
+    const ps=[];for(let i=s;i<=e;i++)ps.push(<button key={i} style={i===currentPage?ds.activePage:ds.pageButton} onClick={()=>loadPage(i)}>{i}</button>);
+    return <div style={ds.paginationContainer}><button style={ds.pageNavButton} onClick={()=>loadPage(1)} disabled={currentPage===1}>{'<<'}</button><button style={ds.pageNavButton} onClick={()=>loadPage(Math.max(1,currentPage-1))} disabled={currentPage===1}>{'<'}</button>{ps}<button style={ds.pageNavButton} onClick={()=>loadPage(Math.min(totalPages,currentPage+1))} disabled={currentPage===totalPages}>{'>'}</button><button style={ds.pageNavButton} onClick={()=>loadPage(totalPages)} disabled={currentPage===totalPages}>{'>>'}</button></div>;
   };
-
-  const handleFIRUpdated = async () => {
-    setShowForm(false);
-    setEditingFIR(null);
-    toast.success('FIR updated successfully!');
-    await loadPaginatedFirs(currentPage);
-  };
-
-  const handleEditClick = (fir) => {
-    setEditingFIR(fir);
-    setShowForm(true);
-  };
-
-  const renderPagination = () => {
-    if (searchMode) return null;
-
-    const maxPagesToShow = 5;
-    let start = Math.max(1, currentPage - 2);
-    let end = Math.min(totalPages, start + maxPagesToShow - 1);
-    if (end - start < maxPagesToShow - 1) start = Math.max(1, end - maxPagesToShow + 1);
-
-    const pages = [];
-    for (let i = start; i <= end; i++) {
-      pages.push(
-        <button
-          key={i}
-          style={i === currentPage ? styles.activePage : styles.pageButton}
-          onClick={() => loadPaginatedFirs(i)}
-        >
-          {i}
-        </button>
-      );
-    }
-
-    return (
-      <div style={styles.paginationContainer}>
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedFirs(1)}
-          disabled={currentPage === 1}
-        >
-          {'<<'}
-        </button>
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedFirs(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
-        >
-          {'<'}
-        </button>
-        {pages}
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedFirs(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage === totalPages}
-        >
-          {'>'}
-        </button>
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedFirs(totalPages)}
-          disabled={currentPage === totalPages}
-        >
-          {'>>'}
-        </button>
-      </div>
-    );
-  };
-
-  if (loading) return <div style={styles.loading}>Loading FIRs...</div>;
-
+  if(loading)return <div style={ds.loading}>Loading FIRs...</div>;
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h2>FIR Management</h2>
-        <button
-          style={styles.addButton}
-          onClick={() => {
-            setEditingFIR(null);
-            setShowForm(!showForm);
-          }}
-        >
-          {showForm ? '← Back to List' : '+ Register New FIR'}
-        </button>
-      </div>
-
-      {showForm ? (
-        <FIRForm
-          onFIRAdded={handleFIRAdded}
-          onFIRUpdated={handleFIRUpdated}
-          onCancel={() => setShowForm(false)}
-          editFIR={editingFIR}
-        />
-      ) : (
-        <>
-          <div style={styles.tableHeader}>
-            <div style={styles.headerLeft}>
-              <input
-                type="text"
-                placeholder="Enter FIR ID..."
-                value={searchId}
-                onChange={(e) => setSearchId(e.target.value)}
-                style={styles.searchInput}
-              />
-              <button style={styles.searchButton} onClick={executeSearch}>
-                Search
-              </button>
-              {searchId && (
-                <button style={styles.clearButton} onClick={handleClearSearch}>
-                  ✕
-                </button>
-              )}
-            </div>
-            {!searchMode && (
-              <span style={styles.resultCount}>
-                Page {currentPage} of {totalPages}
-              </span>
-            )}
-          </div>
-
-          <div style={styles.tableContainer}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.tableTh}>FIR ID</th>
-                  <th style={styles.tableTh}>STATION ID</th>
-                  <th style={styles.tableTh}>DATE REGISTERED</th>
-                  <th style={styles.tableTh}>CRIME TYPE</th>
-                  <th style={styles.tableTh}>INCIDENT LOCATION</th>
-                  <th style={styles.tableTh}>STATUS</th>
-                  <th style={styles.tableTh}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {firs.length > 0 ? (
-                  firs.map((fir) => (
-                    <tr key={fir.fir_id}>
-                      <td style={styles.tableTd}>{fir.fir_id}</td>
-                      <td style={styles.tableTd}>{fir.station}</td>
-                      <td style={styles.tableTd}>
-                        {fir.date_registered ? new Date(fir.date_registered).toLocaleDateString() : 'N/A'}
-                      </td>
-                      <td style={styles.tableTd}>{fir.crime_type || 'N/A'}</td>
-                      <td style={styles.tableTd}>{fir.incident_location || 'N/A'}</td>
-                      <td style={styles.tableTd}>{fir.status || 'N/A'}</td>
-                      <td style={styles.tableTd}>
-                        <div style={styles.actionButtons}>
-                          <button style={styles.editButton} onClick={() => handleEditClick(fir)}>
-                            Edit
-                          </button>
-                          <button
-                            style={styles.deleteButton}
-                            onClick={() => handleDelete(fir.fir_id, fir.crime_type)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="7" style={styles.noData}>
-                      {searchMode ? 'No FIR found with that ID' : 'No FIRs found'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {renderPagination()}
-        </>
-      )}
+    <div style={ds.listContainer}>
+      <div style={ds.listHeader}><h2 style={ds.listTitle}>FIR Management</h2><button style={ds.addButton} onClick={()=>{setEditingFIR(null);setShowForm(!showForm);}}>{showForm?'← Back':'+ Register New FIR'}</button></div>
+      {showForm?<FIRForm onFIRAdded={onAdded} onFIRUpdated={onUpdated} onCancel={()=>setShowForm(false)} editFIR={editingFIR}/>:(<>
+        <div style={ds.tableHeader}><div style={ds.headerLeftRow}><input type="text" placeholder="Enter FIR ID..." value={searchId} onChange={e=>setSearchId(e.target.value)} style={ds.searchInput}/><button style={ds.searchButton} onClick={doSearch}>Search</button>{searchId&&<button style={ds.clearButton} onClick={()=>{setSearchId('');setSearchMode(false);loadPage(currentPage);}}>✕</button>}</div>{!searchMode&&<span style={ds.resultCount}>Page {currentPage} of {totalPages}</span>}</div>
+        <div style={ds.tableContainer}><table style={ds.table}><thead><tr>{['FIR ID','STATION','DATE','CRIME TYPE','LOCATION','STATUS','ACTIONS'].map(h=><th key={h} style={ds.tableTh}>{h}</th>)}</tr></thead><tbody>
+          {firs.length>0?firs.map(f=>(<tr key={f.fir_id}><td style={ds.tableTd}>{f.fir_id}</td><td style={ds.tableTd}>{f.station_name||`Station ${f.station}`}</td><td style={ds.tableTd}>{f.date_registered?new Date(f.date_registered).toLocaleDateString():'N/A'}</td><td style={ds.tableTd}>{f.crime_type||'N/A'}</td><td style={ds.tableTd} title={f.incident_location}>{f.incident_location||'N/A'}</td><td style={ds.tableTd}><span style={getStatusBadge(f.status)}>{f.status||'Unknown'}</span></td><td style={ds.tableTd}><div style={ds.actionButtons}><button style={ds.editButton} onClick={()=>{setEditingFIR(f);setShowForm(true);}}>Edit</button><button style={ds.deleteButton} onClick={()=>handleDelete(f.fir_id,f.crime_type)}>Delete</button></div></td></tr>))
+          :<tr><td colSpan="7" style={ds.noData}>{searchMode?'Not found':'No FIRs'}</td></tr>}
+        </tbody></table></div>{renderPag()}
+      </>)}
     </div>
   );
 };
-
-const styles = {
-  container: {
-    padding: '20px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-    margin: '20px',
-  },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  addButton: {
-    padding: '10px 20px',
-    backgroundColor: '#166534',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-  },
-  tableHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '10px',
-    flexWrap: 'wrap',
-  },
-  headerLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
-  searchInput: {
-    padding: '10px 15px',
-    width: '250px',
-    borderRadius: '6px',
-    border: '1px solid #ccc',
-  },
-  searchButton: {
-    padding: '10px 15px',
-    backgroundColor: '#1e40af',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  clearButton: {
-    padding: '10px 12px',
-    backgroundColor: '#6c757d',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  tableContainer: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  tableTh: {
-    backgroundColor: '#f8f9fa',
-    padding: '10px',
-    textAlign: 'left',
-    borderBottom: '1px solid #dee2e6',
-  },
-  tableTd: {
-    padding: '10px',
-    borderBottom: '1px solid #dee2e6',
-    verticalAlign: 'middle', // ✅ Better vertical alignment
-  },
-  actionButtons: {
-    display: 'flex',
-    gap: '8px',
-    justifyContent: 'center', // ✅ Center buttons horizontally
-    alignItems: 'center', // ✅ Center buttons vertically
-    flexWrap: 'nowrap', // ✅ Prevent wrapping
-  },
-  editButton: {
-    padding: '6px 10px',
-    backgroundColor: '#ffc107',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    whiteSpace: 'nowrap', // ✅ Prevent text wrapping
-  },
-  deleteButton: {
-    padding: '6px 10px',
-    backgroundColor: '#dc3545',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    color: 'white',
-    whiteSpace: 'nowrap', // ✅ Prevent text wrapping
-  },
-  paginationContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '20px',
-    gap: '5px',
-  },
-  pageButton: {
-    padding: '6px 10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  activePage: {
-    padding: '6px 10px',
-    border: '1px solid #166534',
-    backgroundColor: '#166534',
-    color: 'white',
-    borderRadius: '4px',
-  },
-  pageNavButton: {
-    padding: '6px 10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  noData: { textAlign: 'center', padding: '20px', color: '#6c757d' },
-  loading: { textAlign: 'center', padding: '40px', fontSize: '18px' },
-};
-
 export default AdminFIRList;

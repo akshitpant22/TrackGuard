@@ -2,7 +2,6 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
-// Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   },
 });
 
-// Add token to every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
@@ -24,7 +22,6 @@ api.interceptors.request.use(
   }
 );
 
-// Handle token refresh automatically
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -42,11 +39,9 @@ api.interceptors.response.use(
         const { access } = response.data;
         localStorage.setItem('access_token', access);
         
-        // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${access}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - logout user
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');

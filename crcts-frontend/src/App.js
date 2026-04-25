@@ -8,6 +8,7 @@ import CourtDashboard from './pages/Dashboard/CourtDashboard';
 import AdminDashboard from './pages/Dashboard/AdminDashboard';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import AdminCriminalList from './pages/Criminal/AdminCriminalList';
+import SearchByFace from './pages/Criminal/SearchByFace';
 import AdminFIRList from './pages/FIR/AdminFIRList';
 import AdminCourtList from './pages/Court/AdminCourtList';
 import AdminCaseRecordList from './pages/CaseRecord/AdminCaseRecordList';
@@ -139,6 +140,15 @@ function AppRoutes() {
       <Route 
         path="/" 
         element={<Navigate to={getUserDashboard(user)} replace />} 
+      />
+
+      <Route 
+        path="/search-by-face" 
+        element={
+          <ProtectedRoute allowedRoles={['Police', 'Admin']}>
+            <SearchByFace />
+          </ProtectedRoute>
+        } 
       />
       
       

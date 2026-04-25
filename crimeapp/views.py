@@ -21,49 +21,39 @@ def is_police(user):
 def is_court(user):
     return user.groups.filter(name__iexact='court').exists()
 
+
 class RolePermissionMixin:
-    """Dynamic per-role CRUD/view permissions."""
     def get_permissions(self):
         user = self.request.user
         if not user or not user.is_authenticated:
             return [permissions.IsAuthenticated()]
 
-        # Admin 
         if is_admin(user):
             return [permissions.IsAuthenticated()]
 
-        # Police 
         if is_police(user):
             if isinstance(self, (CriminalViewSet, FIRViewSet, CaseCriminalViewSet)):
-        
                 return [permissions.IsAuthenticated()]
             elif isinstance(self, (PoliceStationViewSet, CaseRecordViewSet, CourtViewSet)):
-    
-                if self.request.method in permissions.SAFE_METHODS:
-                    return [permissions.IsAuthenticated()]
-                else:
-                    return [permissions.IsAdminUser()] 
-            else:
-                return [permissions.IsAuthenticated()]
-
-        # Court
-        if is_court(user):
-            if isinstance(self, (CaseRecordViewSet,)):
-        
-                return [permissions.IsAuthenticated()]
-            elif isinstance(self, (CourtViewSet, CriminalViewSet, FIRViewSet, CaseCriminalViewSet)):
-                
                 if self.request.method in permissions.SAFE_METHODS:
                     return [permissions.IsAuthenticated()]
                 else:
                     return [permissions.IsAdminUser()]
             else:
-                
+                return [permissions.IsAuthenticated()]
+
+        if is_court(user):
+            if isinstance(self, (CaseRecordViewSet,)):
+                return [permissions.IsAuthenticated()]
+            elif isinstance(self, (CourtViewSet, CriminalViewSet, FIRViewSet, CaseCriminalViewSet)):
+                if self.request.method in permissions.SAFE_METHODS:
+                    return [permissions.IsAuthenticated()]
+                else:
+                    return [permissions.IsAdminUser()]
+            else:
                 return [permissions.IsAdminUser()]
 
-    
         return [permissions.IsAuthenticated()]
-
 
 
 class CriminalViewSet(RolePermissionMixin, viewsets.ModelViewSet):
@@ -81,7 +71,7 @@ class PoliceStationViewSet(RolePermissionMixin, viewsets.ModelViewSet):
 
 
 class FIRViewSet(RolePermissionMixin, viewsets.ModelViewSet):
-    queryset = FIR.objects.all().order_by('fir_id')
+    queryset = FIR.objects.select_related('station').all().order_by('fir_id')
     serializer_class = FIRSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['fir_id']
@@ -95,44 +85,27 @@ class CourtViewSet(RolePermissionMixin, viewsets.ModelViewSet):
 
 
 class CaseRecordViewSet(RolePermissionMixin, viewsets.ModelViewSet):
-    queryset = CaseRecord.objects.all().order_by('case_id')
+    queryset = CaseRecord.objects.select_related('fir', 'court').all().order_by('case_id')
     serializer_class = CaseRecordSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['case_id']
 
 
 class CaseCriminalViewSet(RolePermissionMixin, viewsets.ModelViewSet):
-    queryset = CaseCriminal.objects.all().order_by('case_criminal_id')
+    queryset = CaseCriminal.objects.select_related('case', 'criminal').all().order_by('case_criminal_id')
     serializer_class = CaseCriminalSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['case_criminal_id']
 
 
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_me(request):
-    """
-    Debug version of user_me — prints exact error cause.
-    """
     user = request.user
     try:
-        print("🟢 DEBUG: Entered user_me()")
-        print("🟢 DEBUG: user =", user)
-        print("🟢 DEBUG: user.is_authenticated =", user.is_authenticated)
-        print("🟢 DEBUG: user.username =", getattr(user, "username", None))
-
-        groups_qs = user.groups.all()
-        print("🟢 DEBUG: user.groups.all() =", groups_qs)
-
-        groups = [g.name.capitalize() for g in groups_qs]
-        print("🟢 DEBUG: Parsed groups =", groups)
-
+        groups = [g.name.capitalize() for g in user.groups.all()]
         if not groups and user.is_superuser:
             groups = ["Admin"]
-
-        print("🟢 DEBUG: Final response groups =", groups)
 
         return Response({
             "username": user.username,
@@ -140,15 +113,13 @@ def user_me(request):
             "groups": groups,
             "is_superuser": user.is_superuser,
         })
-
     except Exception as e:
-        print("❌ ERROR in user_me():", e)
-        traceback.print_exc()
         return Response({"error": str(e)}, status=500)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def statistics_summary(request):
-    """Fast statistics endpoint for Admin dashboard."""
     data = {
         "totalCriminals": Criminal.objects.count(),
         "totalFIRs": FIR.objects.count(),
@@ -159,13 +130,10 @@ def statistics_summary(request):
     }
     return Response(data)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def find_criminal_page(request):
-    """
-    Given a criminal_id, return which page it appears on.
-    Automatically assumes 20 items per page.
-    """
     try:
         criminal_id_param = request.query_params.get('id')
         if not criminal_id_param:

@@ -1,19 +1,17 @@
-"""
-Django settings for crcts_proj project.
-"""
-
+import os
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
-SECRET_KEY = 'django-insecure-z_&3n$r85hd@frz(5#7^pvbm&1ate6zhcryl&)5hsn8n5-k0o*'
-DEBUG = True
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-z_&3n$r85hd@frz(5#7^pvbm&1ate6zhcryl&)5hsn8n5-k0o*')
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,*').split(',')
 
-
-
-# INSTALLED APPS
+# Apps
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -27,7 +25,7 @@ INSTALLED_APPS = [
     'crimeapp',
 ]
 
-# MIDDLEWARE
+# Middleware
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  
     'django.middleware.security.SecurityMiddleware',
@@ -38,7 +36,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
 
 ROOT_URLCONF = 'crcts_proj.urls'
 
@@ -59,19 +56,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'crcts_proj.wsgi.application'
 
-#  DATABASE
-
+# Database
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'crime_db',
-        'USER': 'postgres',
-        'PASSWORD': 'POSTGRE',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
-#  REST FRAMEWORK
+
+SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://txnnzgjogghkydsfcojt.supabase.co')
+SUPABASE_BUCKET = os.getenv('SUPABASE_BUCKET')
+SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', 'sb_publishable_TbquseqvOnMt5m1rTRIWXA_MLUAyUPe')
+
+# REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -84,7 +82,7 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'crimeapp.utils.custom_exception_handler',
 }
 
-#  SIMPLE JWT
+# Simple JWT
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -92,12 +90,8 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
 }
 
-#  CORS SETTINGS (Frontend communication)
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001",
-]
+# CORS Settings
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'content-type',
@@ -105,8 +99,7 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-#  PASSWORD VALIDATORS
-
+# Password Validators
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -114,7 +107,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-#  INTERNATIONALIZATION & STATIC FILES
+# Internationalization & Static Files
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True

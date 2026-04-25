@@ -1,138 +1,65 @@
 import os
 import subprocess
-import time
 import sys
+import platform
+import time
 from pathlib import Path
-import requests
 
-print("=" * 80)
-print("🚀 CRCTS Project Starter (Simplified)")
-print("=" * 80)
-print("\n")
+print("=" * 60)
+print("  CRCTS Project Starter")
+print("=" * 60)
 
-# ---------------------------------------------------------------
-# 1️⃣ Check virtual environment
-# ---------------------------------------------------------------
-VENV_PYTHON = Path("venv/Scripts/python.exe")
-if not VENV_PYTHON.exists():
-    print("❌ Virtual environment not found! Run auto_setup.py first.")
-    sys.exit(1)
-print(f"✅ Virtual environment found")
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "crcts-frontend")
 
-# ---------------------------------------------------------------
-# 2️⃣ Start backend in NEW window
-# ---------------------------------------------------------------
-print("\n" + "=" * 80)
-print("⚙️ Starting Django Backend (http://127.0.0.1:8000)")
-print("=" * 80)
+if platform.system() == "Windows":
+    VENV_PYTHON = os.path.join(BASE_DIR, "venv", "Scripts", "python.exe")
+    NPM_CMD = "npm.cmd"
+else:
+    VENV_PYTHON = os.path.join(BASE_DIR, "venv", "bin", "python")
+    NPM_CMD = "npm"
 
-# Create a batch file to start backend
-backend_bat = '''
-@echo off
-cd /d "D:\PROJECTS\Crime Record Criminal Tracking System\crcts"
-echo Starting Django Backend...
-venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
-echo.
-echo Backend stopped. Press any key to close...
-pause
-'''
-
-with open("start_backend.bat", "w") as f:
-    f.write(backend_bat)
-
-# Start backend in new window
-subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", "start_backend.bat"], shell=True)
-print("✅ Backend started in new terminal window")
-
-# ---------------------------------------------------------------
-# 3️⃣ Wait for backend
-# ---------------------------------------------------------------
-print("\n⏳ Waiting for backend to be ready...")
-backend_ready = False
-
-for i in range(30):  # 30 second timeout
-    try:
-        response = requests.get("http://127.0.0.1:8000/", timeout=2)
-        if response.status_code in [200, 301, 302, 404]:
-            print(f"✅ Backend READY after {i+1} seconds!")
-            backend_ready = True
-            break
-    except:
-        pass
-    time.sleep(1)
-
-if not backend_ready:
-    print("❌ Backend not ready after 30 seconds")
-    print("💡 Please check the backend terminal for errors")
+if not os.path.exists(VENV_PYTHON):
+    print("ERROR: Virtual environment not found. Run 'python auto_setup.py' first.")
     sys.exit(1)
 
-# ---------------------------------------------------------------
-# 4️⃣ Start frontend in NEW window
-# ---------------------------------------------------------------
-print("\n" + "=" * 80)
-print("🌐 Starting React Frontend (http://localhost:3000)")
-print("=" * 80)
+print("Starting Django backend (http://127.0.0.1:8000)...")
+backend_process = subprocess.Popen(
+    [VENV_PYTHON, "manage.py", "runserver", "127.0.0.1:8000"],
+    cwd=BASE_DIR
+)
 
-frontend_path = Path("crcts-frontend")
-if not frontend_path.exists():
-    print("❌ Frontend folder 'crcts-frontend' not found!")
+time.sleep(2)
+
+print("\nStarting React frontend (http://localhost:3000)...")
+if not os.path.exists(FRONTEND_DIR):
+    print("ERROR: Frontend folder 'crcts-frontend' not found.")
+    backend_process.terminate()
     sys.exit(1)
 
-# Create a batch file to start frontend
-frontend_bat = '''
-@echo off
-cd /d "D:\PROJECTS\Crime Record Criminal Tracking System\crcts\crcts-frontend"
-echo Starting React Frontend...
-npm start
-'''
+frontend_process = subprocess.Popen(
+    [NPM_CMD, "start"],
+    cwd=FRONTEND_DIR
+)
 
-with open("start_frontend.bat", "w") as f:
-    f.write(frontend_bat)
+print("\n" + "=" * 60)
+print("  CRCTS System Started Successfully")
+print("=" * 60)
+print("\n  URLs:")
+print("    Backend:  http://127.0.0.1:8000")
+print("    Frontend: http://localhost:3000")
+print("\n  Login Credentials:")
+print("    Admin:   admin / admin123")
+print("    Police:  police1 / police123")
+print("    Court:   court1 / court123")
+print("\n  Press CTRL+C in this terminal to stop both servers.")
+print("=" * 60 + "\n")
 
-# Start frontend in new window
-subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", "start_frontend.bat"], shell=True)
-print("✅ Frontend started in new terminal window")
-
-# ---------------------------------------------------------------
-# 5️⃣ Wait for frontend
-# ---------------------------------------------------------------
-print("\n⏳ Waiting for frontend to be ready...")
-frontend_ready = False
-
-for i in range(30):  # 30 second timeout
-    try:
-        response = requests.get("http://localhost:3000", timeout=2)
-        if response.status_code == 200:
-            print(f"✅ Frontend READY after {i+1} seconds!")
-            frontend_ready = True
-            break
-    except:
-        pass
-    time.sleep(1)
-
-# ---------------------------------------------------------------
-# 6️⃣ Final message
-# ---------------------------------------------------------------
-print("\n" + "=" * 80)
-print("🎉 CRCTS System STARTED!")
-print("=" * 80)
-print("\n📍 URLs:")
-print("   🔗 Backend: http://127.0.0.1:8000")
-print("   🔗 Frontend: http://localhost:3000")
-print("\n👤 Login Credentials:")
-print("   🛠️  Admin: admin / admin123")
-print("   👮 Police: police1 / police123") 
-print("   ⚖️ Court: court1 / court123")
-print("\n💡 IMPORTANT:")
-print("   • Wait for both terminals to show 'ready' messages")
-print("   • Then open: http://localhost:3000")
-print("   • If login fails, wait 30 more seconds and refresh")
-print("\n🛑 To stop: Close both terminal windows")
-print("=" * 80)
-# Cleanup batch files
 try:
-    time.sleep(5)  # Wait a bit before cleanup
-    os.remove("start_backend.bat")
-    os.remove("start_frontend.bat")
-except:
-    pass
+    backend_process.wait()
+    frontend_process.wait()
+except KeyboardInterrupt:
+    print("\nShutting down servers...")
+    backend_process.terminate()
+    frontend_process.terminate()
+    print("Stopped.")

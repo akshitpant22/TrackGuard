@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import caseCriminalService from '../../services/caseCriminalService';
 import AdminCaseCriminalForm from './AdminCaseCriminalForm';
 import { toast } from 'react-toastify';
+import { getStyles } from '../../styles/darkTheme';
+const ds = getStyles('admin');
 
 const AdminCaseCriminalList = () => {
   const [mappings, setMappings] = useState([]);
@@ -12,415 +14,40 @@ const AdminCaseCriminalList = () => {
   const [searchMode, setSearchMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
   const PAGE_SIZE = 20;
 
-  useEffect(() => {
-    loadPaginatedMappings(currentPage);
-  }, [currentPage]);
-
-  // ✅ PAGINATED LOAD - matches Criminal pattern
-  const loadPaginatedMappings = async (page = 1) => {
-    try {
-      setLoading(true);
-      const data = await caseCriminalService.getPaginated(page);
-
-      if (data?.results) {
-        const sorted = data.results.sort((a, b) => a.case_criminal_id - b.case_criminal_id);
-        setMappings(sorted);
-        setTotalPages(Math.ceil(data.count / PAGE_SIZE));
-        setCurrentPage(page);
-      } else {
-        setMappings([]);
-        setTotalPages(1);
-      }
-    } catch (err) {
-      console.error('Error loading case-criminal mappings:', err);
-      toast.error('Failed to load case-criminal mappings.');
-      setMappings([]);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => { loadPage(currentPage); }, [currentPage]);
+  const loadPage = async (page=1) => {
+    try{setLoading(true);const d=await caseCriminalService.getPaginated(page);if(d?.results){setMappings(d.results.sort((a,b)=>a.case_criminal_id-b.case_criminal_id));setTotalPages(Math.ceil(d.count/PAGE_SIZE));setCurrentPage(page);}else{setMappings([]);setTotalPages(1);}}
+    catch(e){toast.error('Failed');setMappings([]);}finally{setLoading(false);}
   };
-
-  // ✅ API SEARCH - matches Criminal pattern
-  const executeSearch = async () => {
-    const value = searchId.trim();
-
-    if (!value) {
-      setSearchMode(false);
-      await loadPaginatedMappings(currentPage);
-      return;
-    }
-
-    if (!/^\d+$/.test(value)) {
-      toast.warning('Search accepts only numeric Case Criminal IDs');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setSearchMode(true);
-      const response = await caseCriminalService.getCaseCriminal(value);
-      setMappings([response]);
-      setTotalPages(1);
-    } catch (err) {
-      console.warn('Case-criminal mapping not found:', err);
-      setMappings([]);
-      toast.info('No case-criminal mapping found with that ID.');
-    } finally {
-      setLoading(false);
-    }
+  const doSearch = async () => {
+    const v=searchId.trim();if(!v){setSearchMode(false);await loadPage(currentPage);return;}if(!/^\d+$/.test(v)){toast.warning('Numeric IDs only');return;}
+    try{setLoading(true);setSearchMode(true);const r=await caseCriminalService.getCaseCriminal(v);setMappings([r]);setTotalPages(1);}catch(e){setMappings([]);toast.info('Not found');}finally{setLoading(false);}
   };
-
-  const handleClearSearch = async () => {
-    setSearchId('');
-    setSearchMode(false);
-    await loadPaginatedMappings(currentPage);
+  const handleDelete = async (id,crimId,caseId) => {
+    if(!window.confirm(`Remove Criminal ${crimId} from Case ${caseId}?`))return;
+    try{const ok=await caseCriminalService.deleteCaseCriminal(id);if(ok){toast.success('Removed');window.dispatchEvent(new Event('refreshStats'));await loadPage(currentPage);}else toast.error('Failed');}catch(e){toast.error('Failed');}
   };
-
-  // ✅ OPTIMISTIC DELETE with dashboard update - matches Criminal pattern
-  const handleDelete = async (id, criminalId, caseId) => {
-    if (!window.confirm(`Are you sure you want to remove Criminal ${criminalId} from Case ${caseId}?`)) return;
-
-    try {
-      const success = await caseCriminalService.deleteCaseCriminal(id);
-      
-      if (success) {
-        toast.success('Mapping deleted successfully');
-        
-        // ✅ Refresh dashboard stats
-        window.dispatchEvent(new Event('refreshStats'));
-        
-        // Simple reload - let useEffect handle the page logic
-        await loadPaginatedMappings(currentPage);
-      } else {
-        toast.error('Failed to delete mapping');
-      }
-    } catch (err) {
-      console.error('Delete error:', err);
-      toast.error('❌ Failed to delete mapping. Please try again.');
-    }
+  const onAdded = async () => {setShowForm(false);toast.success('Mapping created!');await loadPage(currentPage);window.dispatchEvent(new Event('refreshStats'));};
+  const onUpdated = async () => {setShowForm(false);setEditingMapping(null);toast.success('Mapping updated!');await loadPage(currentPage);window.dispatchEvent(new Event('refreshStats'));};
+  const renderPag = () => {
+    if(searchMode)return null;const mx=5;let s=Math.max(1,currentPage-2);let e=Math.min(totalPages,s+mx-1);if(e-s<mx-1)s=Math.max(1,e-mx+1);
+    const ps=[];for(let i=s;i<=e;i++)ps.push(<button key={i} style={i===currentPage?ds.activePage:ds.pageButton} onClick={()=>loadPage(i)}>{i}</button>);
+    return <div style={ds.paginationContainer}><button style={ds.pageNavButton} onClick={()=>loadPage(1)} disabled={currentPage===1}>{'<<'}</button><button style={ds.pageNavButton} onClick={()=>loadPage(Math.max(1,currentPage-1))} disabled={currentPage===1}>{'<'}</button>{ps}<button style={ds.pageNavButton} onClick={()=>loadPage(Math.min(totalPages,currentPage+1))} disabled={currentPage===totalPages}>{'>'}</button><button style={ds.pageNavButton} onClick={()=>loadPage(totalPages)} disabled={currentPage===totalPages}>{'>>'}</button></div>;
   };
-
-  // ✅ UPDATED CALLBACKS with dashboard refresh
-  const handleMappingAdded = async () => {
-    setShowForm(false);
-    toast.success('Case-Criminal mapping created successfully!');
-    await loadPaginatedMappings(currentPage);
-    window.dispatchEvent(new Event('refreshStats'));
-  };
-
-  const handleMappingUpdated = async () => {
-    setShowForm(false);
-    setEditingMapping(null);
-    toast.success('Case-Criminal mapping updated successfully!');
-    await loadPaginatedMappings(currentPage);
-    window.dispatchEvent(new Event('refreshStats'));
-  };
-
-  const handleEditClick = (mapping) => {
-    setEditingMapping(mapping);
-    setShowForm(true);
-  };
-
-  // ✅ PAGINATION RENDER - EXACTLY like CriminalList
-  const renderPagination = () => {
-    if (searchMode) return null;
-
-    const maxPagesToShow = 5;
-    let start = Math.max(1, currentPage - 2);
-    let end = Math.min(totalPages, start + maxPagesToShow - 1);
-    if (end - start < maxPagesToShow - 1) start = Math.max(1, end - maxPagesToShow + 1);
-
-    const pages = [];
-    for (let i = start; i <= end; i++) {
-      pages.push(
-        <button
-          key={i}
-          style={i === currentPage ? styles.activePage : styles.pageButton}
-          onClick={() => loadPaginatedMappings(i)}
-        >
-          {i}
-        </button>
-      );
-    }
-
-    return (
-      <div style={styles.paginationContainer}>
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedMappings(1)}
-          disabled={currentPage === 1}
-        >
-          {'<<'}
-        </button>
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedMappings(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
-        >
-          {'<'}
-        </button>
-        {pages}
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedMappings(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage === totalPages}
-        >
-          {'>'}
-        </button>
-        <button
-          style={styles.pageNavButton}
-          onClick={() => loadPaginatedMappings(totalPages)}
-          disabled={currentPage === totalPages}
-        >
-          {'>>'}
-        </button>
-      </div>
-    );
-  };
-
-  if (loading) return <div style={styles.loading}>Loading case-criminal mappings...</div>;
-
+  if(loading)return <div style={ds.loading}>Loading case-criminal mappings...</div>;
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h2>Case-Criminal Mappings</h2>
-        <button
-          style={styles.addButton}
-          onClick={() => {
-            setEditingMapping(null);
-            setShowForm(!showForm);
-          }}
-        >
-          {showForm ? '← Back to List' : '+ Link Criminal to Case'}
-        </button>
-      </div>
-
-      {showForm ? (
-        <AdminCaseCriminalForm
-          onMappingAdded={handleMappingAdded}
-          onMappingUpdated={handleMappingUpdated}
-          onCancel={() => setShowForm(false)}
-          editMapping={editingMapping}
-        />
-      ) : (
-        <>
-          {/* ✅ TABLE HEADER - EXACTLY like CriminalList */}
-          <div style={styles.tableHeader}>
-            <div style={styles.headerLeft}>
-              <input
-                type="text"
-                placeholder="Enter Case Criminal ID..."
-                value={searchId}
-                onChange={(e) => setSearchId(e.target.value)}
-                style={styles.searchInput}
-              />
-              <button style={styles.searchButton} onClick={executeSearch}>
-                Search
-              </button>
-              {searchId && (
-                <button style={styles.clearButton} onClick={handleClearSearch}>
-                  ✕
-                </button>
-              )}
-            </div>
-            {!searchMode && (
-              <span style={styles.resultCount}>
-                Page {currentPage} of {totalPages}
-              </span>
-            )}
-          </div>
-
-          <div style={styles.tableContainer}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  {/* ✅ FIXED: Column names on one line */}
-                  <th style={styles.columnHeader}>CASE CRIMINAL ID</th>
-                  <th style={styles.columnHeader}>CASE ID</th>
-                  <th style={styles.columnHeader}>CRIMINAL ID</th>
-                  <th style={styles.columnHeader}>ROLE IN CASE</th>
-                  <th style={styles.columnHeader}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mappings.length > 0 ? (
-                  mappings.map((mapping) => (
-                    <tr key={mapping.case_criminal_id}>
-                      <td style={styles.tableTd}>{mapping.case_criminal_id}</td>
-                      <td style={styles.tableTd}>{mapping.case || mapping.case_id || 'N/A'}</td>
-                      <td style={styles.tableTd}>{mapping.criminal || mapping.criminal_id || 'N/A'}</td>
-                      <td style={styles.tableTd}>{mapping.role_in_case || 'Unknown'}</td>
-                      <td style={styles.actionCell}>
-                        {/* ✅ FIXED: Edit/Delete buttons side-by-side */}
-                        <button style={styles.editButton} onClick={() => handleEditClick(mapping)}>
-                          Edit
-                        </button>
-                        <button
-                          style={styles.deleteButton}
-                          onClick={() => handleDelete(mapping.case_criminal_id, mapping.criminal_id, mapping.case_id)}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="5" style={styles.noData}>
-                      {searchMode ? 'No mappings found with that ID' : 'No case-criminal mappings found'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {renderPagination()}
-        </>
-      )}
+    <div style={ds.listContainer}>
+      <div style={ds.listHeader}><h2 style={ds.listTitle}>Case-Criminal Mappings</h2><button style={ds.addButton} onClick={()=>{setEditingMapping(null);setShowForm(!showForm);}}>{showForm?'← Back':'+ Link Criminal to Case'}</button></div>
+      {showForm?<AdminCaseCriminalForm onMappingAdded={onAdded} onMappingUpdated={onUpdated} onCancel={()=>setShowForm(false)} editMapping={editingMapping}/>:(<>
+        <div style={ds.tableHeader}><div style={ds.headerLeftRow}><input type="text" placeholder="Enter Case Criminal ID..." value={searchId} onChange={e=>setSearchId(e.target.value)} style={ds.searchInput}/><button style={ds.searchButton} onClick={doSearch}>Search</button>{searchId&&<button style={ds.clearButton} onClick={()=>{setSearchId('');setSearchMode(false);loadPage(currentPage);}}>✕</button>}</div>{!searchMode&&<span style={ds.resultCount}>Page {currentPage} of {totalPages}</span>}</div>
+        <div style={ds.tableContainer}><table style={ds.table}><thead><tr>{['ID','CASE ID','CRIMINAL ID','ROLE IN CASE','ACTIONS'].map(h=><th key={h} style={ds.tableTh}>{h}</th>)}</tr></thead><tbody>
+          {mappings.length>0?mappings.map(m=>(<tr key={m.case_criminal_id}><td style={ds.tableTd}>{m.case_criminal_id}</td><td style={ds.tableTd}>{m.case||m.case_id||'N/A'}</td><td style={ds.tableTd}>{m.criminal||m.criminal_id||'N/A'}</td><td style={ds.tableTd}>{m.role_in_case||'Unknown'}</td><td style={ds.tableTd}><div style={ds.actionButtons}><button style={ds.editButton} onClick={()=>{setEditingMapping(m);setShowForm(true);}}>Edit</button><button style={ds.deleteButton} onClick={()=>handleDelete(m.case_criminal_id,m.criminal_id,m.case_id)}>Remove</button></div></td></tr>))
+          :<tr><td colSpan="5" style={ds.noData}>{searchMode?'Not found':'No mappings'}</td></tr>}
+        </tbody></table></div>{renderPag()}
+      </>)}
     </div>
   );
 };
-
-// ✅ EXACTLY THE SAME STYLES AS CRIMINALLIST
-const styles = {
-  container: {
-    padding: '20px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-    margin: '20px',
-  },
-  header: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center' 
-  },
-  addButton: {
-    padding: '10px 20px',
-    backgroundColor: '#166534',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-  },
-  tableHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '10px',
-    flexWrap: 'wrap',
-  },
-  headerLeft: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '10px' 
-  },
-  searchInput: {
-    padding: '10px 15px',
-    width: '250px',
-    borderRadius: '6px',
-    border: '1px solid #ccc',
-  },
-  searchButton: {
-    padding: '10px 15px',
-    backgroundColor: '#1e40af',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  clearButton: {
-    padding: '10px 12px',
-    backgroundColor: '#6c757d',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  tableContainer: { 
-    overflowX: 'auto' 
-  },
-  table: { 
-    width: '100%', 
-    borderCollapse: 'collapse' 
-  },
-  // ✅ FIXED: Column header style to prevent text wrapping
-  columnHeader: {
-    backgroundColor: '#f8f9fa',
-    padding: '10px',
-    textAlign: 'left',
-    borderBottom: '1px solid #dee2e6',
-    whiteSpace: 'nowrap',
-    minWidth: '80px',
-  },
-  tableTd: {
-    padding: '10px',
-    borderBottom: '1px solid #dee2e6',
-  },
-  // ✅ FIXED: Action cell with proper button layout
-  actionCell: {
-    padding: '10px',
-    borderBottom: '1px solid #dee2e6',
-    whiteSpace: 'nowrap',
-  },
-  editButton: {
-    padding: '6px 10px',
-    backgroundColor: '#ffc107',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    marginRight: '5px',
-  },
-  deleteButton: {
-    padding: '6px 10px',
-    backgroundColor: '#dc3545',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    color: 'white',
-  },
-  paginationContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '20px',
-    gap: '5px',
-  },
-  pageButton: {
-    padding: '6px 10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  activePage: {
-    padding: '6px 10px',
-    border: '1px solid #166534',
-    backgroundColor: '#166534',
-    color: 'white',
-    borderRadius: '4px',
-  },
-  pageNavButton: {
-    padding: '6px 10px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  noData: { 
-    textAlign: 'center', 
-    padding: '20px', 
-    color: '#6c757d' 
-  },
-  loading: { 
-    textAlign: 'center', 
-    padding: '40px', 
-    fontSize: '18px' 
-  },
-};
-
 export default AdminCaseCriminalList;

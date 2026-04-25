@@ -1,197 +1,163 @@
 import os
-import psycopg2
-import getpass
-import time
 import sys
 import subprocess
-import importlib
+import platform
 
 
-required_packages = [
-    "django",
-    "djangorestframework",
-    "djangorestframework-simplejwt",
-    "psycopg2-binary",
-    "django-cors-headers"
-]
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "crcts-frontend")
+VENV_DIR = os.path.join(BASE_DIR, "venv")
 
-for pkg in required_packages:
-    try:
-        importlib.import_module(pkg.split('-')[0])
-    except ImportError:
-        print(f"⚙️ Installing missing dependency: {pkg}...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+if platform.system() == "Windows":
+    VENV_PYTHON = os.path.join(VENV_DIR, "Scripts", "python.exe")
+    VENV_PIP = os.path.join(VENV_DIR, "Scripts", "pip.exe")
+else:
+    VENV_PYTHON = os.path.join(VENV_DIR, "bin", "python")
+    VENV_PIP = os.path.join(VENV_DIR, "bin", "pip")
 
 
-DB_NAME = "crime_db"
-DB_USER = "postgres"
-DB_PASSWORD = "POSTGRE"
-DB_HOST = "localhost"
-DB_PORT = "5432"
-
-DATA_FOLDER = os.path.join(os.getcwd(), "data")
-SQL_SCHEMA_FILE = os.path.join(os.getcwd(), "create_tables.sql")
-
-CSV_FILES = {
-    "criminals": "criminals.csv",
-    "police_stations": "police_stations.csv",
-    "firs": "firs.csv",
-    "courts": "courts.csv",
-    "case_records": "case_records.csv",
-    "case_criminals": "case_criminals.csv"
-}
+def run(cmd, cwd=None, check=True):
+    print(f"  > {cmd}")
+    result = subprocess.run(cmd, shell=True, cwd=cwd or BASE_DIR)
+    if check and result.returncode != 0:
+        print(f"  Command failed with exit code {result.returncode}")
+        sys.exit(1)
+    return result
 
 
-def connect_postgres(dbname="postgres"):
-    """Connect to PostgreSQL database."""
-    try:
-        conn = psycopg2.connect(
-            dbname=dbname,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            host=DB_HOST,
-            port=DB_PORT
-        )
-        conn.autocommit = True
-        return conn
-    except Exception as e:
-        print(f"❌ Failed to connect to database '{dbname}': {e}")
+def step(msg):
+    print(f"\n{'='*50}")
+    print(f"  {msg}")
+    print(f"{'='*50}")
+
+
+def check_python():
+    step("Checking Python")
+    version = sys.version.split()[0]
+    print(f"  Python {version} detected")
+    if sys.version_info < (3, 9):
+        print("  Python 3.9+ is required.")
         sys.exit(1)
 
 
-def recreate_database():
-    """Drop and recreate the crime_db."""
-    print("🧹 Checking for old database...")
-    conn = connect_postgres("postgres")
-    cur = conn.cursor()
+def check_node():
+    step("Checking Node.js")
+    try:
+        result = subprocess.run("node --version", shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"  Node {result.stdout.strip()} detected")
+        else:
+            raise FileNotFoundError
+    except FileNotFoundError:
+        print("  Node.js not found. Install it from https://nodejs.org")
+        sys.exit(1)
 
-    cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (DB_NAME,))
-    if cur.fetchone():
-        print(f"⚠️ Existing database '{DB_NAME}' found. Dropping it...")
-        cur.execute(f"DROP DATABASE {DB_NAME}")
-        time.sleep(1)
 
-    print(f"✅ Creating new database '{DB_NAME}'...")
-    cur.execute(f"CREATE DATABASE {DB_NAME}")
-    cur.close()
-    conn.close()
+def create_venv():
+    step("Setting up Python virtual environment")
+    if os.path.exists(VENV_PYTHON):
+        print("  Virtual environment already exists, skipping.")
+        return
+
+    print("  Creating virtual environment...")
+    run(f'"{sys.executable}" -m venv venv')
+    print("  Done.")
+
+
+def install_backend_deps():
+    step("Installing Python dependencies")
+    req_file = os.path.join(BASE_DIR, "requirements.txt")
+    if not os.path.exists(req_file):
+        print("  requirements.txt not found!")
+        sys.exit(1)
+
+    # Use python -m pip to avoid Device Guard blocks on pip.exe.
+    run(f'"{VENV_PYTHON}" -m pip install --upgrade pip setuptools wheel')
+    run(f'"{VENV_PYTHON}" -m pip install -r requirements.txt')
+    print("  All Python packages installed.")
+
+
+def install_frontend_deps():
+    step("Installing frontend dependencies")
+    if not os.path.exists(FRONTEND_DIR):
+        print("  Frontend directory not found!")
+        sys.exit(1)
+
+    node_modules = os.path.join(FRONTEND_DIR, "node_modules")
+    if os.path.exists(node_modules):
+        print("  node_modules already exists, skipping.")
+        return
+
+    run("npm install", cwd=FRONTEND_DIR)
+    print("  All npm packages installed.")
+
 
 def run_migrations():
-    """Run Django migrations."""
-    print("⚙️ Running Django migrations...")
-    try:
-        subprocess.run(
-            [sys.executable, "manage.py", "migrate"],
-            check=True,
-            env=os.environ
-        )
-        print("✅ Migrations completed.")
-    except subprocess.CalledProcessError as e:
-        print("❌ Migration failed. Full error below:\n")
-        print(e)
+    step("Running Django migrations")
+    env_file = os.path.join(BASE_DIR, ".env")
+    if not os.path.exists(env_file):
+        print("  WARNING: .env file not found!")
+        print("  Create a .env file with DATABASE_URL and Supabase keys.")
+        print("  See README.md for the required format.")
         sys.exit(1)
 
+    run(f'"{VENV_PYTHON}" manage.py migrate')
+    print("  Migrations applied.")
 
 
-def create_tables_from_sql():
-    """Execute create_tables.sql to build schema for managed=False models."""
-    if not os.path.exists(SQL_SCHEMA_FILE):
-        print(f"⚠️ SQL schema file not found: {SQL_SCHEMA_FILE}")
-        sys.exit(1)
+def check_env_files():
+    step("Checking environment files")
 
-    print("🧱 Creating database tables from SQL schema...")
+    backend_env = os.path.join(BASE_DIR, ".env")
+    frontend_env = os.path.join(FRONTEND_DIR, ".env")
 
-    try:
-        subprocess.run(
-            ["psql", "-U", DB_USER, "-d", DB_NAME, "-f", SQL_SCHEMA_FILE],
-            check=True,
-            env=os.environ
-        )
-        print("✅ Tables created successfully.")
-    except subprocess.CalledProcessError as e:
-        print("❌ Failed to execute create_tables.sql. Full error:")
-        print(e)
-        sys.exit(1)
+    if os.path.exists(backend_env):
+        print("  Backend .env found.")
+    else:
+        print("  Backend .env NOT found.")
+        print("  Creating template .env file...")
+        with open(backend_env, "w") as f:
+            f.write("SECRET_KEY=your_secret_key_here\n")
+            f.write("DEBUG=True\n")
+            f.write("ALLOWED_HOSTS=localhost,127.0.0.1\n")
+            f.write("DATABASE_URL=postgresql://your_user:your_password@your_host:5432/your_db\n")
+            f.write("SUPABASE_URL=https://your-project.supabase.co\n")
+            f.write("SUPABASE_ANON_KEY=your_anon_key_here\n")
+            f.write("SUPABASE_BUCKET=criminal-faces\n")
+        print("  Template created. Fill in your Supabase credentials before running.")
 
-def import_csv_data():
-    """Import CSV data into tables."""
-    print("\n📥 Importing data from CSV files...\n")
-
-    conn = connect_postgres(DB_NAME)
-    cur = conn.cursor()
-
-    for table, csv_file in CSV_FILES.items():
-        file_path = os.path.join(DATA_FOLDER, csv_file)
-        if not os.path.exists(file_path):
-            print(f"⚠️ CSV not found for table {table}: {file_path}")
-            continue
-
-        print(f"⏳ Importing {csv_file} → {table} ...")
-        with open(file_path, "r", encoding="utf-8") as f:
-            cur.copy_expert(f"COPY {table} FROM STDIN WITH CSV HEADER", f)
-        print(f"✅ Imported data for {table}")
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-def create_users():
-    """Prompt for custom usernames and passwords for each role."""
-    print("\n👥 Create user accounts for Admin, Police, and Court roles\n")
-
-    roles = [
-        ("Admin", True, "admin"),
-        ("Police", False, "police"),
-        ("Court", False, "court")
-    ]
-
-    for display_name, is_superuser, group_name in roles:
-        print(f"🧩 Create {display_name} account:")
-        username = input(f"👤 Enter username for {display_name} (default: {group_name}): ").strip() or group_name
-        password = input(f"🔑 Enter password for {display_name}: ").strip()
-
-        if not username or not password:
-            print(f"⚠️ Skipping {display_name} — username or password empty!")
-            continue
-
-        print(f"⚙️ Creating {display_name} user...")
-
-        create_user_script = f"""
-from django.contrib.auth.models import User, Group
-# Ensure group exists
-group, _ = Group.objects.get_or_create(name='{group_name}')
-
-u, created = User.objects.get_or_create(username='{username}')
-u.set_password('{password}')
-u.is_staff = True
-u.is_superuser = {str(is_superuser)}
-u.save()
-u.groups.clear()
-u.groups.add(group)
-print('✅ Created/updated {display_name} user:', u.username, '| Group:', group.name)
-"""
-        subprocess.run([sys.executable, "manage.py", "shell"], input=create_user_script.encode(), check=True)
-
-    print("✅ All users created and assigned to correct roles!\n")
+    if os.path.exists(frontend_env):
+        print("  Frontend .env found.")
+    else:
+        print("  Frontend .env NOT found. Creating...")
+        with open(frontend_env, "w") as f:
+            f.write("REACT_APP_API_BASE_URL=http://127.0.0.1:8000/api\n")
+            f.write("REACT_APP_BACKEND_URL=http://127.0.0.1:8000\n")
+        print("  Frontend .env created.")
 
 
 def main():
-    print("🚀 CRIME RECORD TRACKING SYSTEM - AUTO SETUP\n")
-    print("===========================================")
-    print("This will prepare your database, run migrations, create tables, import all CSV data, and set up user accounts.\n")
+    print("\n" + "=" * 50)
+    print("  CRCTS Auto Setup")
+    print("  Crime Records & Criminal Tracking System")
+    print("=" * 50)
 
-    global DB_USER, DB_PASSWORD
-    DB_USER = input("👤 Enter PostgreSQL username (default: postgres): ") or "postgres"
-    DB_PASSWORD = getpass.getpass("🔑 Enter PostgreSQL password (default: POSTGRE): ") or "POSTGRE"
-
-    recreate_database()
+    check_python()
+    check_node()
+    check_env_files()
+    create_venv()
+    install_backend_deps()
+    install_frontend_deps()
     run_migrations()
-    create_tables_from_sql()
-    import_csv_data()
-    create_users()
 
-    print("\n✅ Setup complete! You can now run the project using:")
-    print("👉 python start_project.py\n")
+    print("\n" + "=" * 50)
+    print("  Setup Complete!")
+    print("=" * 50)
+    print("\n  To start the project:")
+    print("    python start_project.py")
+    print("\n  Login credentials are stored in the Supabase database.")
+    print("  Default accounts: admin, police1, court1")
+    print("=" * 50 + "\n")
 
 
 if __name__ == "__main__":

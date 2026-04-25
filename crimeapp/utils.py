@@ -3,9 +3,6 @@ from rest_framework.response import Response
 from rest_framework import status
 
 def custom_exception_handler(exc, context):
-    """
-    Custom exception handler that converts masked 404s into real 403s.
-    """
     response = exception_handler(exc, context)
 
     if response is None:

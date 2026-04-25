@@ -1,262 +1,91 @@
 import React, { useState, useEffect } from 'react';
 import criminalService from '../../services/criminalService';
+import api from '../../services/api';
 import { toast } from 'react-toastify';
+import { getStyles } from '../../styles/darkTheme';
+const ds = getStyles('admin');
 
 const CriminalForm = ({ onCriminalAdded, onCriminalUpdated, onCancel, editCriminal = null }) => {
-  const [formData, setFormData] = useState({
-    criminal_id: '',
-    first_name: '',
-    last_name: '',
-    dob: '',
-    gender: '',
-    address: '',
-    aadhaar_number: ''
-  });
+  const [formData, setFormData] = useState({ criminal_id:'', first_name:'', last_name:'', dob:'', gender:'', address:'', aadhaar_number:'' });
   const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState(null);
 
-  // ✅ Populate form when editing
   useEffect(() => {
     if (editCriminal) {
-      setFormData({
-        criminal_id: editCriminal.criminal_id || editCriminal.id,
-        first_name: editCriminal.first_name || '',
-        last_name: editCriminal.last_name || '',
-        dob: editCriminal.dob || '',
-        gender: editCriminal.gender || '',
-        address: editCriminal.address || '',
-        aadhaar_number: editCriminal.aadhaar_number || ''
-      });
-    }
+      setFormData({ criminal_id: editCriminal.criminal_id||editCriminal.id, first_name: editCriminal.first_name||'', last_name: editCriminal.last_name||'', dob: editCriminal.dob||'', gender: editCriminal.gender||'', address: editCriminal.address||'', aadhaar_number: editCriminal.aadhaar_number||'' });
+      setCurrentImageUrl(editCriminal.image_url||null); setImageFile(null);
+    } else { setCurrentImageUrl(null); setImageFile(null); }
   }, [editCriminal]);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const handleChange = (e) => setFormData({...formData, [e.target.name]: e.target.value});
+
+  const handleImageUpload = async (criminalId) => {
+    if (!imageFile) return;
+    setImageUploading(true);
+    try {
+      const fd = new FormData(); fd.append('image', imageFile);
+      const response = await api.post(`/add-criminal-face/${criminalId}/`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const url = response?.data?.image_url || response?.data?.data?.image_url || null;
+      if (url) setCurrentImageUrl(url);
+      toast.success('Face image uploaded'); setImageFile(null);
+    } catch (error) { toast.error(`Image upload failed: ${error.response?.data?.error||error.message}`); }
+    finally { setImageUploading(false); }
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
+    e.preventDefault(); setLoading(true);
     try {
-      // ✅ Validation
-      if (!formData.criminal_id || !formData.first_name || !formData.last_name || !formData.dob || !formData.gender) {
-        toast.error('All fields except Aadhaar and Address are required');
-        return;
-      }
-
-      if (isNaN(formData.criminal_id)) {
-        toast.error('Criminal ID must be a number');
-        return;
-      }
-
-      console.log('📤 Sending criminal data:', formData);
-
+      if (!formData.criminal_id||!formData.first_name||!formData.last_name||!formData.dob||!formData.gender) { toast.error('All required fields must be filled'); return; }
+      if (isNaN(formData.criminal_id)) { toast.error('Criminal ID must be a number'); return; }
       let result;
       if (editCriminal) {
-        const targetId = editCriminal.criminal_id || editCriminal.id;
-        result = await criminalService.updateCriminal(targetId, formData);
+        const tid = editCriminal.criminal_id||editCriminal.id;
+        result = await criminalService.updateCriminal(tid, formData);
         if (onCriminalUpdated) onCriminalUpdated(result);
-      //  toast.success('Criminal updated successfully!');
+        if (imageFile) await handleImageUpload(tid);
       } else {
         result = await criminalService.createCriminal(formData);
         if (onCriminalAdded) onCriminalAdded(result);
-        //toast.success('Criminal added successfully!');
+        if (imageFile) await handleImageUpload(result?.criminal_id||formData.criminal_id);
       }
-
-      // ✅ Refresh global dashboard
       window.dispatchEvent(new Event('refreshStats'));
-
-      if (!editCriminal) {
-        setFormData({
-          criminal_id: '',
-          first_name: '',
-          last_name: '',
-          dob: '',
-          gender: '',
-          address: '',
-          aadhaar_number: ''
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error saving criminal:', error);
-      toast.error(`Failed to save criminal: ${error.response?.data?.detail || error.message}`);
-    } finally {
-      setLoading(false);
-    }
+      if (!editCriminal) { setFormData({ criminal_id:'', first_name:'', last_name:'', dob:'', gender:'', address:'', aadhaar_number:'' }); if(!imageFile) setCurrentImageUrl(null); }
+    } catch (error) { toast.error(`Failed: ${error.response?.data?.detail||error.message}`); }
+    finally { setLoading(false); }
   };
 
   return (
-    <div style={styles.formContainer}>
-      <h3 style={styles.formTitle}>{editCriminal ? 'Edit Criminal' : 'Add New Criminal'}</h3>
-      <form onSubmit={handleSubmit} style={styles.form}>
-        <div style={styles.formRow}>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Criminal ID *</label>
-            <input
-              type="number"
-              name="criminal_id"
-              value={formData.criminal_id}
-              onChange={handleChange}
-              style={styles.input}
-              required
-              placeholder="Unique criminal ID"
-              disabled={!!editCriminal}
-            />
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>First Name *</label>
-            <input
-              type="text"
-              name="first_name"
-              value={formData.first_name}
-              onChange={handleChange}
-              style={styles.input}
-              required
-              placeholder="Enter first name"
-            />
-          </div>
+    <div style={ds.formContainer}>
+      <h3 style={ds.formTitle}>{editCriminal ? 'Edit Criminal' : 'Add New Criminal'}</h3>
+      <form onSubmit={handleSubmit} style={ds.form}>
+        <div style={ds.formRow}>
+          <div style={ds.formGroup}><label style={ds.label}>Criminal ID *</label><input type="number" name="criminal_id" value={formData.criminal_id} onChange={handleChange} style={ds.input} required placeholder="Unique criminal ID" disabled={!!editCriminal}/></div>
+          <div style={ds.formGroup}><label style={ds.label}>First Name *</label><input type="text" name="first_name" value={formData.first_name} onChange={handleChange} style={ds.input} required placeholder="Enter first name"/></div>
         </div>
-
-        <div style={styles.formRow}>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Last Name *</label>
-            <input
-              type="text"
-              name="last_name"
-              value={formData.last_name}
-              onChange={handleChange}
-              style={styles.input}
-              required
-              placeholder="Enter last name"
-            />
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Date of Birth *</label>
-            <input
-              type="date"
-              name="dob"
-              value={formData.dob}
-              onChange={handleChange}
-              style={styles.input}
-              required
-            />
-          </div>
+        <div style={ds.formRow}>
+          <div style={ds.formGroup}><label style={ds.label}>Last Name *</label><input type="text" name="last_name" value={formData.last_name} onChange={handleChange} style={ds.input} required placeholder="Enter last name"/></div>
+          <div style={ds.formGroup}><label style={ds.label}>Date of Birth *</label><input type="date" name="dob" value={formData.dob} onChange={handleChange} style={ds.input} required/></div>
         </div>
-
-        <div style={styles.formRow}>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Gender *</label>
-            {/* ✅ Full names stored and displayed */}
-            <select
-              name="gender"
-              value={formData.gender}
-              onChange={handleChange}
-              style={styles.input}
-              required
-            >
-              <option value="">Select Gender</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Aadhaar Number</label>
-            <input
-              type="text"
-              name="aadhaar_number"
-              value={formData.aadhaar_number}
-              onChange={handleChange}
-              style={styles.input}
-              placeholder="12-digit Aadhaar number"
-              maxLength="12"
-            />
-          </div>
+        <div style={ds.formRow}>
+          <div style={ds.formGroup}><label style={ds.label}>Gender *</label><select name="gender" value={formData.gender} onChange={handleChange} style={ds.input} required><option value="">Select Gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
+          <div style={ds.formGroup}><label style={ds.label}>Aadhaar Number</label><input type="text" name="aadhaar_number" value={formData.aadhaar_number} onChange={handleChange} style={ds.input} placeholder="12-digit Aadhaar" maxLength="12"/></div>
         </div>
-
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Address</label>
-          <textarea
-            name="address"
-            value={formData.address}
-            onChange={handleChange}
-            style={styles.textarea}
-            rows="3"
-            placeholder="Enter complete address"
-          />
+        <div style={ds.formGroup}><label style={ds.label}>Address</label><textarea name="address" value={formData.address} onChange={handleChange} style={ds.textarea} rows="3" placeholder="Enter complete address"/></div>
+        <div style={ds.formGroup}>
+          <label style={ds.label}>Face Image (Optional)</label>
+          {currentImageUrl && <div style={ds.thumbnailContainer}><img src={currentImageUrl} alt="Criminal face" style={ds.thumbnail}/></div>}
+          <input type="file" accept="image/*" onChange={(e)=>setImageFile(e.target.files?.[0]||null)} style={{...ds.input,padding:'8px 14px'}}/>
+          {imageFile && <div style={ds.fileName}>Selected: {imageFile.name}</div>}
         </div>
-
-        <div style={styles.formActions}>
-          <button type="button" onClick={onCancel} style={styles.cancelButton} disabled={loading}>
-            Cancel
-          </button>
-          <button type="submit" style={styles.submitButton} disabled={loading}>
-            {loading ? 'Saving...' : editCriminal ? 'Update Criminal' : 'Add Criminal'}
-          </button>
+        <div style={ds.formActions}>
+          <button type="button" onClick={onCancel} style={ds.cancelButton} disabled={loading||imageUploading}>Cancel</button>
+          <button type="submit" style={ds.submitButton} disabled={loading||imageUploading}>{loading||imageUploading?'Saving...':editCriminal?'Update Criminal':'Add Criminal'}</button>
         </div>
       </form>
     </div>
   );
-};
-
-const styles = {
-  formContainer: {
-    backgroundColor: 'white',
-    padding: '25px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-    margin: '20px',
-    maxWidth: '600px'
-  },
-  formTitle: {
-    marginBottom: '20px',
-    color: '#1e293b',
-    fontSize: '20px',
-    fontWeight: '600'
-  },
-  form: { marginTop: '20px' },
-  formRow: { display: 'flex', gap: '15px', marginBottom: '15px' },
-  formGroup: { flex: 1, marginBottom: '15px' },
-  label: { display: 'block', marginBottom: '5px', fontWeight: '600', color: '#374151' },
-  input: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    fontSize: '14px',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.3s ease'
-  },
-  textarea: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    fontSize: '14px',
-    resize: 'vertical'
-  },
-  formActions: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '25px' },
-  cancelButton: {
-    padding: '10px 20px',
-    backgroundColor: '#6c757d',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: '500'
-  },
-  submitButton: {
-    padding: '10px 20px',
-    backgroundColor: '#1e40af',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: '600'
-  }
 };
 
 export default CriminalForm;

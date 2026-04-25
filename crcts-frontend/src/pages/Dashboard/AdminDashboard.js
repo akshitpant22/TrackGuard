@@ -1,241 +1,169 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { getStyles } from '../../styles/darkTheme';
 import AdminCriminalList from '../Criminal/AdminCriminalList';
+import SearchByFace from '../Criminal/SearchByFace';
 import AdminFIRList from '../FIR/AdminFIRList';
 import AdminCourtList from '../Court/AdminCourtList';
 import AdminCaseRecordList from '../CaseRecord/AdminCaseRecordList';
 import AdminPoliceStationList from '../PoliceStation/AdminPoliceStationList';
 import AdminCaseCriminalList from '../CaseCriminal/AdminCaseCriminalList';
 
+const ds = getStyles('admin');
+const t = ds.theme;
+
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
-  const [stats, setStats] = useState({
-    totalCriminals: 0,
-    totalFIRs: 0,
-    totalCases: 0,
-    totalCourts: 0,
-    totalPoliceStations: 0,
-    totalCaseCriminals: 0,
-    loading: true
-  });
+  const [stats, setStats] = useState({ totalCriminals:0, totalFIRs:0, totalCases:0, totalCourts:0, totalPoliceStations:0, totalCaseCriminals:0, loading:true });
+  const [hoveredAction, setHoveredAction] = useState(null);
 
+  useEffect(() => { if (activeTab === 'overview') fetchStatistics(); }, [activeTab]);
   useEffect(() => {
-    if (activeTab === 'overview') {
-      fetchStatistics();
-    }
-  }, [activeTab]);
+    const h = () => fetchStatistics();
+    window.addEventListener('refreshStats', h);
+    return () => window.removeEventListener('refreshStats', h);
+  }, []);
 
   const fetchStatistics = async () => {
     try {
-      setStats(prev => ({ ...prev, loading: true }));
-      console.log('⚡ Fetching fast statistics summary...');
-
-      const token = localStorage.getItem('access_token'); 
-      if (!token) {
-        console.warn('⚠️ No token found in localStorage (access_token missing).');
-        setStats(prev => ({ ...prev, loading: false }));
-        return;
-      }
-
-      const response = await fetch('http://127.0.0.1:8000/api/statistics/', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
+      setStats(p => ({ ...p, loading: true }));
+      const token = localStorage.getItem('access_token');
+      if (!token) { setStats(p => ({ ...p, loading: false })); return; }
+      const response = await fetch('http://127.0.0.1:8000/api/statistics/', { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      console.log('✅ Statistics fetched successfully:', data);
-
-      setStats({
-        totalCriminals: data.totalCriminals || 0,
-        totalFIRs: data.totalFIRs || 0,
-        totalCases: data.totalCases || 0,
-        totalCourts: data.totalCourts || 0,
-        totalPoliceStations: data.totalPoliceStations || 0,
-        totalCaseCriminals: data.totalCaseCriminals || 0,
-        loading: false
-      });
-    } catch (error) {
-      console.error('❌ Error fetching statistics:', error);
-      setStats(prev => ({ ...prev, loading: false }));
-    }
+      setStats({ totalCriminals: data.totalCriminals||0, totalFIRs: data.totalFIRs||0, totalCases: data.totalCases||0, totalCourts: data.totalCourts||0, totalPoliceStations: data.totalPoliceStations||0, totalCaseCriminals: data.totalCaseCriminals||0, loading: false });
+    } catch (error) { console.error('Error fetching statistics:', error); setStats(p => ({ ...p, loading: false })); }
   };
+
+  const tabs = [
+    ['overview','Overview'],['criminals','Criminals'],['firs','FIRs'],['courts','Courts'],
+    ['cases','Cases'],['policeStations','Police Stations'],['caseCriminals','Case-Criminal'],['searchByFace','Search by Face']
+  ];
+
+  const statCards = [
+    { icon: '👥', label: 'Total Criminals', value: stats.totalCriminals },
+    { icon: '📋', label: 'FIR Records', value: stats.totalFIRs },
+    { icon: '⚖️', label: 'Court Cases', value: stats.totalCases },
+    { icon: '🏛️', label: 'Courts', value: stats.totalCourts },
+    { icon: '🏢', label: 'Police Stations', value: stats.totalPoliceStations },
+    { icon: '🔗', label: 'Case-Criminal Mappings', value: stats.totalCaseCriminals },
+  ];
+
+  const quickActions = [
+    { icon: '👥', label: 'Manage Criminals', tab: 'criminals' },
+    { icon: '📋', label: 'Manage FIRs', tab: 'firs' },
+    { icon: '🏛️', label: 'Manage Courts', tab: 'courts' },
+    { icon: '⚖️', label: 'Manage Cases', tab: 'cases' },
+    { icon: '🏢', label: 'Manage Police Stations', tab: 'policeStations' },
+    { icon: '🔗', label: 'Manage Case-Criminal Mappings', tab: 'caseCriminals' },
+    { icon: '🔍', label: 'Search Criminal by Face', tab: 'searchByFace' },
+  ];
+
+  const SkeletonCard = () => (
+    <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '18px 16px', opacity: 0.5 }}>
+      <div style={{ width: 48, height: 22, background: t.border, borderRadius: 4, marginBottom: 8 }} />
+      <div style={{ width: 80, height: 10, background: t.border, borderRadius: 4 }} />
+    </div>
+  );
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'criminals':
-        return <AdminCriminalList />;
-      case 'firs':
-        return <AdminFIRList />;
-      case 'courts':
-        return <AdminCourtList />;
-      case 'cases':
-        return <AdminCaseRecordList />;
-      case 'policeStations':
-        return <AdminPoliceStationList />;
-      case 'caseCriminals':
-        return <AdminCaseCriminalList />;
-      default:
-        return (
-          <div style={styles.content}>
-            <div style={styles.card}>
-              <div style={styles.cardHeader}>
-                <h3 style={styles.cardTitle}>📊 System Overview</h3>
-                <div style={styles.cardBadge}>Live Data</div>
-              </div>
+      case 'criminals': return <AdminCriminalList />;
+      case 'firs': return <AdminFIRList />;
+      case 'courts': return <AdminCourtList />;
+      case 'cases': return <AdminCaseRecordList />;
+      case 'policeStations': return <AdminPoliceStationList />;
+      case 'caseCriminals': return <AdminCaseCriminalList />;
+      case 'searchByFace': return <SearchByFace />;
+      default: return (
+        <div style={{ animation: 'tg-slideIn 0.3s ease-out' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 20, minHeight: 'calc(100vh - 180px)' }}>
 
-              {stats.loading ? (
-                <div style={styles.loadingContainer}>
-                  <div style={styles.loadingSpinner}></div>
-                  <p style={styles.loadingText}>Loading statistics...</p>
-                </div>
-              ) : (
-                <>
-                  <div style={styles.statsGrid}>
-                    <StatItem icon="👥" label="Total Criminals" value={stats.totalCriminals} />
-                    <StatItem icon="📋" label="FIR Records" value={stats.totalFIRs} />
-                    <StatItem icon="⚖️" label="Court Cases" value={stats.totalCases} />
-                    <StatItem icon="🏛️" label="Courts" value={stats.totalCourts} />
-                    <StatItem icon="🏢" label="Police Stations" value={stats.totalPoliceStations} />
-                    <StatItem icon="🔗" label="Case-Criminal Mappings" value={stats.totalCaseCriminals} />
-                  </div>
-                  <button onClick={fetchStatistics} style={styles.refreshButton}>
-                    🔄 Refresh Data
+
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, flex: 1 }}>
+                {stats.loading ? (
+                  Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+                ) : (
+                  statCards.map(({ icon, label, value }) => (
+                    <div key={label} style={{
+                      background: t.surface, borderLeft: `3px solid ${t.accent}`,
+                      borderRadius: 8, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: 16 }}>{icon}</span>
+                        <span style={{ fontSize: 10, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</span>
+                      </div>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: t.accent, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
+                        {value.toLocaleString()}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div style={{ marginTop: 16 }}>
+                <button onClick={fetchStatistics} style={{
+                  padding: '9px 20px', background: t.accentBg, color: t.accent,
+                  border: `1px solid ${t.accentBorder}`, borderRadius: 6,
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}>↻ Refresh Data</button>
+              </div>
+            </div>
+
+
+            <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column' }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: t.text, margin: '0 0 14px', textTransform: 'uppercase', letterSpacing: '1px' }}>Quick Actions</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+                {quickActions.map(({ icon, label, tab }) => (
+                  <button key={tab} onClick={() => setActiveTab(tab)}
+                    onMouseEnter={() => setHoveredAction(tab)} onMouseLeave={() => setHoveredAction(null)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '12px 12px',
+                      background: hoveredAction === tab ? t.accentBg : 'transparent',
+                      border: 'none', borderRadius: 6, cursor: 'pointer',
+                      transition: 'all 0.2s', width: '100%', textAlign: 'left',
+                    }}>
+                    <span style={{ fontSize: 15, flexShrink: 0 }}>{icon}</span>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: hoveredAction === tab ? t.text : t.text2 }}>{label}</span>
+                    <span style={{
+                      fontSize: 14, color: t.accent, opacity: hoveredAction === tab ? 1 : 0,
+                      transform: hoveredAction === tab ? 'translateX(0)' : 'translateX(-4px)',
+                      transition: 'all 0.2s',
+                    }}>→</span>
                   </button>
-                </>
-              )}
-            </div>
-            <div style={styles.card}>
-              <div style={styles.cardHeader}>
-                <h3 style={styles.cardTitle}>🚀 Quick Actions</h3>
-                <div style={styles.cardBadge}>Management</div>
-              </div>
-              <div style={styles.actionsGrid}>
-                <ActionButton label="Manage Criminals" icon="👥" onClick={() => setActiveTab('criminals')} />
-                <ActionButton label="Manage FIRs" icon="📋" onClick={() => setActiveTab('firs')} />
-                <ActionButton label="Manage Courts" icon="🏛️" onClick={() => setActiveTab('courts')} />
-                <ActionButton label="Manage Cases" icon="⚖️" onClick={() => setActiveTab('cases')} />
-                <ActionButton label="Manage Police Stations" icon="🏢" onClick={() => setActiveTab('policeStations')} />
-                <ActionButton label="Manage Case-Criminal Mappings" icon="🔗" onClick={() => setActiveTab('caseCriminals')} />
+                ))}
               </div>
             </div>
+
           </div>
-        );
+        </div>
+      );
     }
   };
 
   return (
-    <div style={styles.container}>
-    
-      <div style={styles.header}>
-        <div style={styles.headerContent}>
-          <div style={styles.headerLeft}>
-            <h1 style={styles.title}>Admin Dashboard</h1>
-            <p style={styles.subtitle}>CRCTS Management System</p>
-          </div>
-          <div style={styles.userInfo}>
-            <div style={styles.userDetails}>
-              <span style={styles.welcomeText}>Welcome,</span>
-              <span style={styles.username}>{user?.username}</span>
-            </div>
-            <button onClick={logout} style={styles.logoutButton}>
-              Logout
-            </button>
-          </div>
+    <div style={ds.container}>
+      <div style={ds.header}><div style={ds.headerContent}>
+        <div style={ds.headerLeft}>
+          <h1 style={ds.title}>TrackGuard</h1>
+          <div style={ds.headerDot} />
+          <p style={ds.subtitle}>Admin</p>
         </div>
-      </div>
-      <div style={styles.tabContainer}>
-        <div style={styles.tabContent}>
-          {['overview', 'criminals', 'firs', 'courts', 'cases', 'policeStations', 'caseCriminals'].map(tab => (
-            <button
-              key={tab}
-              style={activeTab === tab ? styles.activeTab : styles.tab}
-              onClick={() => setActiveTab(tab)}
-            >
-              {getTabIcon(tab)} {tab === 'overview' ? 'Overview' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
+        <div style={ds.userInfo}>
+          <span style={ds.username}>{user?.username}</span>
+          <button onClick={logout} style={ds.logoutButton}>Sign Out</button>
         </div>
-      </div>
-
-
-      <div style={styles.mainContent}>{renderContent()}</div>
+      </div></div>
+      <div style={ds.tabContainer}><div style={ds.tabContent}>
+        {tabs.map(([key,label])=>(
+          <button key={key} style={activeTab===key?ds.activeTab:ds.tab} onClick={()=>setActiveTab(key)}>{label}</button>
+        ))}
+      </div></div>
+      <div style={ds.mainContent}>{renderContent()}</div>
     </div>
   );
-};
-
-const StatItem = ({ icon, label, value }) => (
-  <div style={styles.statItem}>
-    <div style={styles.statIcon}>{icon}</div>
-    <div style={styles.statInfo}>
-      <div style={styles.statNumber}>{value.toLocaleString()}</div>
-      <div style={styles.statLabel}>{label}</div>
-    </div>
-  </div>
-);
-
-const ActionButton = ({ label, icon, onClick }) => (
-  <button style={styles.actionButton} onClick={onClick}>
-    <span style={styles.actionIcon}>{icon}</span>
-    <span style={styles.actionText}>{label}</span>
-  </button>
-);
-
-const getTabIcon = tab => {
-  const icons = {
-    overview: '📊',
-    criminals: '👤',
-    firs: '📋',
-    courts: '🏛️',
-    cases: '⚖️',
-    policeStations: '🏢',
-    caseCriminals: '🔗'
-  };
-  return icons[tab] || '📁';
-};
-
-const styles = {
-  container: { minHeight: '100vh', backgroundColor: '#f8fdf9', fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" },
-  header: { background: 'linear-gradient(135deg, #166534 0%, #22c55e 100%)', color: 'white', boxShadow: '0 4px 20px rgba(22,101,52,0.3)' },
-  headerContent: { maxWidth: '1200px', margin: '0 auto', padding: '20px 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  headerLeft: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  title: { margin: 0, fontSize: '32px', fontWeight: '700', letterSpacing: '-0.5px' },
-  subtitle: { margin: 0, fontSize: '14px', fontWeight: '400', opacity: '0.9' },
-  userInfo: { display: 'flex', alignItems: 'center', gap: '20px' },
-  userDetails: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' },
-  welcomeText: { fontSize: '12px', opacity: '0.8' },
-  username: { fontSize: '16px', fontWeight: '600' },
-  logoutButton: { padding: '10px 20px', backgroundColor: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '8px', cursor: 'pointer' },
-  tabContainer: { backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(22,101,52,0.1)' },
-  tabContent: { maxWidth: '1200px', margin: '0 auto', padding: '0 30px', display: 'flex', flexWrap: 'wrap' },
-  tab: { padding: '18px 24px', backgroundColor: 'transparent', border: 'none', borderBottom: '3px solid transparent', cursor: 'pointer', fontSize: '14px', color: '#64748b' },
-  activeTab: { padding: '18px 24px', borderBottom: '3px solid #166534', fontWeight: '600', color: '#166534' },
-  mainContent: { padding: '40px 30px', maxWidth: '1200px', margin: '0 auto' },
-  content: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' },
-  card: { backgroundColor: 'white', padding: '30px', borderRadius: '16px', boxShadow: '0 4px 25px rgba(22,101,52,0.08)' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', paddingBottom: '15px', borderBottom: '2px solid #f1f9f5' },
-  cardTitle: { fontSize: '20px', fontWeight: '600' },
-  cardBadge: { padding: '6px 12px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '20px', fontSize: '12px', fontWeight: '600' },
-  statsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '25px' },
-  statItem: { display: 'flex', alignItems: 'center', padding: '20px', backgroundColor: '#f8fdf9', borderRadius: '12px', border: '1px solid #e2e8f0' },
-  statIcon: { fontSize: '28px', marginRight: '15px', opacity: '0.8' },
-  statInfo: { flex: 1 },
-  statNumber: { fontSize: '22px', fontWeight: '700', color: '#166534' },
-  statLabel: { fontSize: '12px', color: '#64748b', textTransform: 'uppercase', fontWeight: '600' },
-  actionsGrid: { display: 'grid', gridTemplateColumns: '1fr', gap: '12px' },
-  actionButton: { display: 'flex', alignItems: 'center', padding: '18px 20px', backgroundColor: '#f8fdf9', color: '#334155', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer' },
-  actionIcon: { fontSize: '20px', marginRight: '15px', opacity: '0.7' },
-  actionText: { fontSize: '15px', fontWeight: '500' },
-  refreshButton: { padding: '12px 24px', backgroundColor: '#166534', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' },
-  loadingContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: '15px' },
-  loadingSpinner: { width: '40px', height: '40px', border: '4px solid #e2e8f0', borderTop: '4px solid #166534', borderRadius: '50%', animation: 'spin 1s linear infinite' },
-  loadingText: { color: '#64748b', fontSize: '14px', fontWeight: '500' }
 };
 
 export default AdminDashboard;

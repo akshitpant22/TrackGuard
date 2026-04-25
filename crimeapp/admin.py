@@ -113,3 +113,8 @@ class PoliceStationAdmin(admin.ModelAdmin):
 class CaseCriminalAdmin(admin.ModelAdmin):
     list_display = ('case_criminal_id', 'case', 'criminal', 'role_in_case')
     search_fields = ('role_in_case',)
+
+
+
+
+ 
