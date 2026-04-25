@@ -12,6 +12,5 @@ dj-database-url==3.1.2
 python-dotenv==1.2.2
 supabase==2.28.3
 deepface==0.0.99
-tensorflow
-tf-keras
+tensorflow==2.13.0
 gunicorn==23.0.0
