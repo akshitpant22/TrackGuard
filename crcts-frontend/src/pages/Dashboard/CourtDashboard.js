@@ -27,7 +27,7 @@ const CourtDashboard = () => {
     try {
       setStats(p => ({ ...p, loading: true }));
       const token = localStorage.getItem('access_token');
-      const response = await fetch('https://trackguard-backend-28oc.onrender.com/api/statistics/', { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+      const response = await fetch('https://akshitpant22-trackguard-backend.hf.space/api/statistics/', { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
       if (response.ok) {
         const data = await response.json();
         setStats({ totalCourts: data.totalCourts||0, totalCaseRecords: data.totalCases||0, totalCriminals: data.totalCriminals||0, totalFIRs: data.totalFIRs||0, totalCaseCriminals: data.totalCaseCriminals||0, loading: false });
