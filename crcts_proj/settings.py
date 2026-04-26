@@ -10,7 +10,14 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-z_&3n$r85hd@frz(5#7^pvbm&1ate6zhcryl&)5hsn8n5-k0o*')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS = ['https://*.onrender.com', 'https://*.vercel.app']
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.onrender.com',
+    'https://*.hf.space',
+    'https://*.huggingface.co',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
 
 # Apps
 INSTALLED_APPS = [
