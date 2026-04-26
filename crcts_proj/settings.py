@@ -15,6 +15,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.onrender.com',
     'https://*.hf.space',
     'https://*.huggingface.co',
+    'https://*.vercel.app',
+    'https://trackguard-gules.vercel.app',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
 ]
@@ -101,6 +103,11 @@ SIMPLE_JWT = {
 
 # CORS Settings
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    'https://trackguard-gules.vercel.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'content-type',
